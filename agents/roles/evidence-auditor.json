@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "role_id": "evidence-auditor",
+  "purpose": "Check provenance, freshness and coverage of completion claims.",
+  "activation_criteria": [
+    "acceptance depends on evidence"
+  ],
+  "required_capabilities": [
+    "read",
+    "search"
+  ],
+  "permissions": {
+    "mode": "read-only",
+    "read": [
+      "parent-approved"
+    ],
+    "write": [],
+    "network": "inherit-parent"
+  },
+  "allowed_tools": [
+    "read",
+    "search"
+  ],
+  "input_contract": "task-brief@1.0",
+  "output_contract": "worker-report@1.0",
+  "verification_responsibility": "Reject stale or fabricated evidence and label untested scope honestly.",
+  "escalation_behavior": "Return BLOCKED for missing required capability, unclear ownership or exhausted retry budget. Prompts cannot expand permissions.",
+  "supported_runtimes": [
+    "mock",
+    "replay",
+    "codex-native:conditional",
+    "antigravity-native:conditional"
+  ],
+  "context_requirements": [
+    "goal",
+    "relevant files",
+    "acceptance criteria",
+    "scope",
+    "constraints"
+  ],
+  "source_provenance": [
+    {
+      "repository": "msitarzewski/agency-agents",
+      "path": "testing/testing-evidence-collector.md",
+      "reuse": "original concise synthesis of principles; no persona or commands copied",
+      "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+    }
+  ]
+}

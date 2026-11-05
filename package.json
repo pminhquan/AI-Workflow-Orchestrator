@@ -1,0 +1,17 @@
+{
+  "name": "ai-workflow-orchestrator",
+  "version": "2.1.0-foundation",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test tests/unit/*.test.mjs tests/integration/*.test.mjs",
+    "validate": "node src/cli.mjs validate",
+    "compile": "node src/cli.mjs compile",
+    "doctor": "node src/cli.mjs doctor",
+    "benchmark": "node benchmarks/run.mjs"
+  },
+  "license": "UNLICENSED"
+}

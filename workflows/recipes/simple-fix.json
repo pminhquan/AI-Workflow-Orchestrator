@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "recipe_id": "simple-fix",
+  "trigger_kind": "fix",
+  "planning_depth": "minimal",
+  "required_inputs": [
+    "reproduction",
+    "acceptance criteria"
+  ],
+  "suggested_roles": [
+    "implementer"
+  ],
+  "breakdown_strategy": "one bounded change",
+  "max_parallelism": 1,
+  "acceptance_criteria": [
+    "scope agreed",
+    "required checks pass",
+    "limitations disclosed"
+  ],
+  "verification_strategy": "reproduce and check the changed behavior",
+  "recovery_conditions": [
+    "failed check: bounded rework",
+    "unavailable worker: DIRECT if critical requirements survive",
+    "scope violation: BLOCKED"
+  ],
+  "completion_criteria": [
+    "accepted artifacts",
+    "fresh evidence",
+    "integration owner review"
+  ],
+  "direct_fallback": true
+}

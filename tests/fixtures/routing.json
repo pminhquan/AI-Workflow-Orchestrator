@@ -1,0 +1,12 @@
+{
+  "kind": "feature",
+  "size": "medium",
+  "independent_units": 1,
+  "expected_benefit": 3,
+  "ownership_clear": true,
+  "dependencies_clear": true,
+  "milestones": [],
+  "critical_capabilities": [],
+  "can_direct": true,
+  "runtime_id": "mock"
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "recipe_id": "feature-development",
+  "trigger_kind": "feature",
+  "planning_depth": "standard",
+  "required_inputs": [
+    "feature behavior",
+    "acceptance criteria"
+  ],
+  "suggested_roles": [
+    "explorer",
+    "implementer",
+    "test-engineer"
+  ],
+  "breakdown_strategy": "independent acceptance slices",
+  "max_parallelism": 2,
+  "acceptance_criteria": [
+    "scope agreed",
+    "required checks pass",
+    "limitations disclosed"
+  ],
+  "verification_strategy": "behavior tests and integration review",
+  "recovery_conditions": [
+    "failed check: bounded rework",
+    "unavailable worker: DIRECT if critical requirements survive",
+    "scope violation: BLOCKED"
+  ],
+  "completion_criteria": [
+    "accepted artifacts",
+    "fresh evidence",
+    "integration owner review"
+  ],
+  "direct_fallback": true
+}

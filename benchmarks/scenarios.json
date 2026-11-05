@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "timing_kind": "synthetic-only",
+  "scenarios": [
+    "simple-direct",
+    "medium-one-worker",
+    "independent-parallel",
+    "complex-dependency-graph",
+    "worker-unavailable",
+    "unsupported-adapter",
+    "duplicate-submission",
+    "scope-conflict",
+    "stale-checks",
+    "invalid-report",
+    "worker-failure",
+    "retry-exhaustion",
+    "partial-completion",
+    "cancellation",
+    "no-op-validation-reuse"
+  ],
+  "comparison_groups": [
+    "codex-only",
+    "codex-plus-one-worker",
+    "codex-plus-two-workers",
+    "native-teamwork-separate-supported-trial"
+  ],
+  "metrics": [
+    "end_to_end_ms",
+    "planning_ms",
+    "dispatch_ms",
+    "queue_delay_ms",
+    "worker_execution_ms",
+    "review_wait_ms",
+    "verification_ms",
+    "integration_ms",
+    "retry_count",
+    "human_interventions",
+    "quality",
+    "tokens",
+    "cost"
+  ],
+  "live_measurements": null,
+  "performance_improvement_claim": null
+}

@@ -1,0 +1,408 @@
+[
+  {
+    "repository": "msitarzewski/agency-agents",
+    "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219",
+    "reference": "HEAD via git ls-remote",
+    "license": {
+      "spdx_id": "MIT",
+      "path": "LICENSE"
+    },
+    "files": [
+      {
+        "path": "README.md",
+        "url": "https://github.com/msitarzewski/agency-agents/blob/b37b5bb33b78f2c1d6567d98e25ca818e3259219/README.md",
+        "status": "readable",
+        "sha256": "b37c2f0efa75013915f55c7456aecf4d9c68d646fb82e4db05850216ea025e65",
+        "bytes": 86705
+      },
+      {
+        "path": "LICENSE",
+        "url": "https://github.com/msitarzewski/agency-agents/blob/b37b5bb33b78f2c1d6567d98e25ca818e3259219/LICENSE",
+        "status": "readable",
+        "sha256": "9a45258434d5cedf0af73c9ad4771373701225038d246c49219026c33677f66f",
+        "bytes": 1079
+      },
+      {
+        "path": "LICENSE.md",
+        "url": "https://github.com/msitarzewski/agency-agents/blob/b37b5bb33b78f2c1d6567d98e25ca818e3259219/LICENSE.md",
+        "status": "unavailable",
+        "error": "HTTP Error 404: Not Found"
+      },
+      {
+        "path": "LICENSE.txt",
+        "url": "https://github.com/msitarzewski/agency-agents/blob/b37b5bb33b78f2c1d6567d98e25ca818e3259219/LICENSE.txt",
+        "status": "unavailable",
+        "error": "HTTP Error 404: Not Found"
+      },
+      {
+        "path": "specialized/agents-orchestrator.md",
+        "url": "https://github.com/msitarzewski/agency-agents/blob/b37b5bb33b78f2c1d6567d98e25ca818e3259219/specialized/agents-orchestrator.md",
+        "status": "readable",
+        "sha256": "3f900ee286eba5a809388ecc22ad860c4a3ef9ed7ff25488e80eac18f3a0f317",
+        "bytes": 15725
+      },
+      {
+        "path": "engineering/engineering-multi-agent-systems-architect.md",
+        "url": "https://github.com/msitarzewski/agency-agents/blob/b37b5bb33b78f2c1d6567d98e25ca818e3259219/engineering/engineering-multi-agent-systems-architect.md",
+        "status": "readable",
+        "sha256": "d93dd20fef67bf85a537ba0f869fad1a17d0e589f20899d1bbe1f095a7bcb91b",
+        "bytes": 29301
+      },
+      {
+        "path": "engineering/engineering-minimal-change-engineer.md",
+        "url": "https://github.com/msitarzewski/agency-agents/blob/b37b5bb33b78f2c1d6567d98e25ca818e3259219/engineering/engineering-minimal-change-engineer.md",
+        "status": "readable",
+        "sha256": "9999cc74e7b3936af892ef2c2793d105bb92f6c47789aa23db6df92bf68b45e5",
+        "bytes": 11231
+      },
+      {
+        "path": "engineering/engineering-code-reviewer.md",
+        "url": "https://github.com/msitarzewski/agency-agents/blob/b37b5bb33b78f2c1d6567d98e25ca818e3259219/engineering/engineering-code-reviewer.md",
+        "status": "readable",
+        "sha256": "7509fcc3ea1dda46511b2801996305bf3d4a125576f9655ff0b63df25602f446",
+        "bytes": 3076
+      },
+      {
+        "path": "testing/testing-evidence-collector.md",
+        "url": "https://github.com/msitarzewski/agency-agents/blob/b37b5bb33b78f2c1d6567d98e25ca818e3259219/testing/testing-evidence-collector.md",
+        "status": "readable",
+        "sha256": "ff1868ae89f3be62f6f0da1fc8693582f18578c77751b8a65a53169ef15ececd",
+        "bytes": 8910
+      },
+      {
+        "path": "strategy/runbooks.json",
+        "url": "https://github.com/msitarzewski/agency-agents/blob/b37b5bb33b78f2c1d6567d98e25ca818e3259219/strategy/runbooks.json",
+        "status": "readable",
+        "sha256": "2d0372782460694bddcbdb5ec04ff28ae6284a2c751888f8010e16033024ac49",
+        "bytes": 6769
+      },
+      {
+        "path": "strategy/coordination/handoff-templates.md",
+        "url": "https://github.com/msitarzewski/agency-agents/blob/b37b5bb33b78f2c1d6567d98e25ca818e3259219/strategy/coordination/handoff-templates.md",
+        "status": "readable",
+        "sha256": "297dff8ea47b35e02b5d53cefb31aa05e1d880a1440c4c90ef9dec6156b68931",
+        "bytes": 10073
+      }
+    ]
+  },
+  {
+    "repository": "msitarzewski/agency-agents-app",
+    "commit": "dda50547cf7999820f8ed991800200488e237ec5",
+    "reference": "HEAD via git ls-remote",
+    "license": {
+      "spdx_id": "MIT",
+      "path": "LICENSE"
+    },
+    "files": [
+      {
+        "path": "README.md",
+        "url": "https://github.com/msitarzewski/agency-agents-app/blob/dda50547cf7999820f8ed991800200488e237ec5/README.md",
+        "status": "readable",
+        "sha256": "ac104a878b8ea83028dfbbb5d4520f528d9d2f563ed53819c35de530fac2fd05",
+        "bytes": 10753
+      },
+      {
+        "path": "LICENSE",
+        "url": "https://github.com/msitarzewski/agency-agents-app/blob/dda50547cf7999820f8ed991800200488e237ec5/LICENSE",
+        "status": "readable",
+        "sha256": "c8b8982c466ac9cec26a9649ec00ec40b31e05bc8b8858b2ce783124e9af59b8",
+        "bytes": 1076
+      },
+      {
+        "path": "LICENSE.md",
+        "url": "https://github.com/msitarzewski/agency-agents-app/blob/dda50547cf7999820f8ed991800200488e237ec5/LICENSE.md",
+        "status": "unavailable",
+        "error": "HTTP Error 404: Not Found"
+      },
+      {
+        "path": "LICENSE.txt",
+        "url": "https://github.com/msitarzewski/agency-agents-app/blob/dda50547cf7999820f8ed991800200488e237ec5/LICENSE.txt",
+        "status": "unavailable",
+        "error": "HTTP Error 404: Not Found"
+      },
+      {
+        "path": "src-tauri/src/render/mod.rs",
+        "url": "https://github.com/msitarzewski/agency-agents-app/blob/dda50547cf7999820f8ed991800200488e237ec5/src-tauri/src/render/mod.rs",
+        "status": "readable",
+        "sha256": "8edcc68b7d557b78dd3cc18b6bbfc01a33376cda0eda20d0e8eb448e524f2747",
+        "bytes": 36585
+      },
+      {
+        "path": "src-tauri/src/install/mod.rs",
+        "url": "https://github.com/msitarzewski/agency-agents-app/blob/dda50547cf7999820f8ed991800200488e237ec5/src-tauri/src/install/mod.rs",
+        "status": "readable",
+        "sha256": "d60e9dadeb18945d2b9394dbf76559d7e189d6fa85c95a1aa40ffbf6ec1365ae",
+        "bytes": 71978
+      }
+    ]
+  },
+  {
+    "repository": "wshobson/agents",
+    "commit": "7e2fb559cf4b824b27f1fec49fe88f7511066d26",
+    "reference": "HEAD via git ls-remote",
+    "license": {
+      "spdx_id": "MIT",
+      "path": "LICENSE"
+    },
+    "files": [
+      {
+        "path": "README.md",
+        "url": "https://github.com/wshobson/agents/blob/7e2fb559cf4b824b27f1fec49fe88f7511066d26/README.md",
+        "status": "readable",
+        "sha256": "8469d4f011ce26fb97a34cf079610c8cabb8ef82bcfb20417818f7c1e8738c81",
+        "bytes": 9662
+      },
+      {
+        "path": "LICENSE",
+        "url": "https://github.com/wshobson/agents/blob/7e2fb559cf4b824b27f1fec49fe88f7511066d26/LICENSE",
+        "status": "readable",
+        "sha256": "f89abb55d9f073f38f1703e4518f0613c788c6174be7f13b8dfe48a1c076c746",
+        "bytes": 1068
+      },
+      {
+        "path": "LICENSE.md",
+        "url": "https://github.com/wshobson/agents/blob/7e2fb559cf4b824b27f1fec49fe88f7511066d26/LICENSE.md",
+        "status": "unavailable",
+        "error": "HTTP Error 404: Not Found"
+      },
+      {
+        "path": "LICENSE.txt",
+        "url": "https://github.com/wshobson/agents/blob/7e2fb559cf4b824b27f1fec49fe88f7511066d26/LICENSE.txt",
+        "status": "unavailable",
+        "error": "HTTP Error 404: Not Found"
+      },
+      {
+        "path": "docs/harnesses.md",
+        "url": "https://github.com/wshobson/agents/blob/7e2fb559cf4b824b27f1fec49fe88f7511066d26/docs/harnesses.md",
+        "status": "readable",
+        "sha256": "518a770bf97e79e5f2d849fc002f5fb86885ea97064fda9302967bfbb6d500a8",
+        "bytes": 18055
+      },
+      {
+        "path": "tools/adapters/capabilities.py",
+        "url": "https://github.com/wshobson/agents/blob/7e2fb559cf4b824b27f1fec49fe88f7511066d26/tools/adapters/capabilities.py",
+        "status": "readable",
+        "sha256": "8e8f957041ec678613e02dfe0b0772b54f31473b1747d101db3910d65af171cf",
+        "bytes": 16224
+      },
+      {
+        "path": "tools/adapters/codex.py",
+        "url": "https://github.com/wshobson/agents/blob/7e2fb559cf4b824b27f1fec49fe88f7511066d26/tools/adapters/codex.py",
+        "status": "readable",
+        "sha256": "25bc7096a1dd1dae9013e076df51f987dab65890b4b897fc7ee677c43c4f0d22",
+        "bytes": 26991
+      },
+      {
+        "path": "tools/adapters/antigravity.py",
+        "url": "https://github.com/wshobson/agents/blob/7e2fb559cf4b824b27f1fec49fe88f7511066d26/tools/adapters/antigravity.py",
+        "status": "readable",
+        "sha256": "025f0d5387df96065ce8a1adfacc642eb17750a5e4232b43fc1ad52427b5d726",
+        "bytes": 9409
+      }
+    ]
+  },
+  {
+    "repository": "obra/superpowers",
+    "commit": "22f0b463e7a5e579904dd6211a520321035526f7",
+    "reference": "HEAD via git ls-remote",
+    "license": {
+      "spdx_id": "MIT",
+      "path": "LICENSE"
+    },
+    "files": [
+      {
+        "path": "README.md",
+        "url": "https://github.com/obra/superpowers/blob/22f0b463e7a5e579904dd6211a520321035526f7/README.md",
+        "status": "readable",
+        "sha256": "79f29f50c735862d2e304ea547b4c9aa67d9db6909ff6fb7b5ea922d7bcbc3e7",
+        "bytes": 14847
+      },
+      {
+        "path": "LICENSE",
+        "url": "https://github.com/obra/superpowers/blob/22f0b463e7a5e579904dd6211a520321035526f7/LICENSE",
+        "status": "readable",
+        "sha256": "a37e0e9697144819e1d965176ac4ae5bc3fa02d11e7812036bbcadf6dafe2400",
+        "bytes": 1070
+      },
+      {
+        "path": "LICENSE.md",
+        "url": "https://github.com/obra/superpowers/blob/22f0b463e7a5e579904dd6211a520321035526f7/LICENSE.md",
+        "status": "unavailable",
+        "error": "HTTP Error 404: Not Found"
+      },
+      {
+        "path": "LICENSE.txt",
+        "url": "https://github.com/obra/superpowers/blob/22f0b463e7a5e579904dd6211a520321035526f7/LICENSE.txt",
+        "status": "unavailable",
+        "error": "HTTP Error 404: Not Found"
+      },
+      {
+        "path": "skills/verification-before-completion/SKILL.md",
+        "url": "https://github.com/obra/superpowers/blob/22f0b463e7a5e579904dd6211a520321035526f7/skills/verification-before-completion/SKILL.md",
+        "status": "readable",
+        "sha256": "2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3",
+        "bytes": 3646
+      },
+      {
+        "path": "skills/subagent-driven-development/SKILL.md",
+        "url": "https://github.com/obra/superpowers/blob/22f0b463e7a5e579904dd6211a520321035526f7/skills/subagent-driven-development/SKILL.md",
+        "status": "readable",
+        "sha256": "1baf70e307bde682c462513c86116333f1f066168c6710f45145bf5f0b00828d",
+        "bytes": 19740
+      },
+      {
+        "path": "skills/using-git-worktrees/SKILL.md",
+        "url": "https://github.com/obra/superpowers/blob/22f0b463e7a5e579904dd6211a520321035526f7/skills/using-git-worktrees/SKILL.md",
+        "status": "readable",
+        "sha256": "8cfb86f121269e8f7f12361e6795c4f6738828340e28964c9229d365666c9edd",
+        "bytes": 6813
+      },
+      {
+        "path": "skills/writing-plans/SKILL.md",
+        "url": "https://github.com/obra/superpowers/blob/22f0b463e7a5e579904dd6211a520321035526f7/skills/writing-plans/SKILL.md",
+        "status": "readable",
+        "sha256": "a6c67c1900064347c2a329990dd3c555657c51c3ec53b259a08aa01a2c26139a",
+        "bytes": 10335
+      }
+    ]
+  },
+  {
+    "repository": "bmad-code-org/BMAD-METHOD",
+    "commit": "022be9314e4facd16826104a9f8033e1c5ed4fdc",
+    "reference": "HEAD via git ls-remote",
+    "license": {
+      "spdx_id": "MIT",
+      "path": "LICENSE"
+    },
+    "files": [
+      {
+        "path": "README.md",
+        "url": "https://github.com/bmad-code-org/BMAD-METHOD/blob/022be9314e4facd16826104a9f8033e1c5ed4fdc/README.md",
+        "status": "readable",
+        "sha256": "7547d18b57a7004a057ace1b03dd10394bd6f687f4174172b73d7d7cf5687d5a",
+        "bytes": 7919
+      },
+      {
+        "path": "LICENSE",
+        "url": "https://github.com/bmad-code-org/BMAD-METHOD/blob/022be9314e4facd16826104a9f8033e1c5ed4fdc/LICENSE",
+        "status": "readable",
+        "sha256": "0aa79baf6328b4a1e694ce10a12ffc36d7666554da128dff0e8fcda0fc536a66",
+        "bytes": 1572
+      },
+      {
+        "path": "LICENSE.md",
+        "url": "https://github.com/bmad-code-org/BMAD-METHOD/blob/022be9314e4facd16826104a9f8033e1c5ed4fdc/LICENSE.md",
+        "status": "unavailable",
+        "error": "HTTP Error 404: Not Found"
+      },
+      {
+        "path": "LICENSE.txt",
+        "url": "https://github.com/bmad-code-org/BMAD-METHOD/blob/022be9314e4facd16826104a9f8033e1c5ed4fdc/LICENSE.txt",
+        "status": "unavailable",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ]
+  },
+  {
+    "repository": "github/spec-kit",
+    "commit": "ec9a6f3b94c0aa856f77e550785a1ddde1993de1",
+    "reference": "HEAD via git ls-remote",
+    "license": {
+      "spdx_id": "MIT",
+      "path": "LICENSE"
+    },
+    "files": [
+      {
+        "path": "README.md",
+        "url": "https://github.com/github/spec-kit/blob/ec9a6f3b94c0aa856f77e550785a1ddde1993de1/README.md",
+        "status": "readable",
+        "sha256": "076c7ae6d7f58798a0c063ad398356bf64f1ce1002202b5f215a83d893c6fa29",
+        "bytes": 14337
+      },
+      {
+        "path": "LICENSE",
+        "url": "https://github.com/github/spec-kit/blob/ec9a6f3b94c0aa856f77e550785a1ddde1993de1/LICENSE",
+        "status": "readable",
+        "sha256": "2510b446bc1f0cf9702453075d20cd88631e20e5642658edb7325d9c1eb534f7",
+        "bytes": 1060
+      },
+      {
+        "path": "LICENSE.md",
+        "url": "https://github.com/github/spec-kit/blob/ec9a6f3b94c0aa856f77e550785a1ddde1993de1/LICENSE.md",
+        "status": "unavailable",
+        "error": "HTTP Error 404: Not Found"
+      },
+      {
+        "path": "LICENSE.txt",
+        "url": "https://github.com/github/spec-kit/blob/ec9a6f3b94c0aa856f77e550785a1ddde1993de1/LICENSE.txt",
+        "status": "unavailable",
+        "error": "HTTP Error 404: Not Found"
+      },
+      {
+        "path": "spec-driven.md",
+        "url": "https://github.com/github/spec-kit/blob/ec9a6f3b94c0aa856f77e550785a1ddde1993de1/spec-driven.md",
+        "status": "readable",
+        "sha256": "1517eba9868e7066541ffa484009d5eb9c7d8d04bf740dbfd86e5e88c396f0c6",
+        "bytes": 26229
+      },
+      {
+        "path": "templates/plan-template.md",
+        "url": "https://github.com/github/spec-kit/blob/ec9a6f3b94c0aa856f77e550785a1ddde1993de1/templates/plan-template.md",
+        "status": "readable",
+        "sha256": "dfba43da2b2a207ff8c177a0fba03af074fd45e261696b4b64172041fad2e992",
+        "bytes": 3770
+      },
+      {
+        "path": "templates/tasks-template.md",
+        "url": "https://github.com/github/spec-kit/blob/ec9a6f3b94c0aa856f77e550785a1ddde1993de1/templates/tasks-template.md",
+        "status": "readable",
+        "sha256": "1e448e9153462e8c5b5a55231a54c756d870a82950d4dd9425a2bf5b7008a0d9",
+        "bytes": 9182
+      }
+    ]
+  },
+  {
+    "repository": "gastownhall/gastown",
+    "commit": "466aa41c83ee73b1fa0eb79eb9d172fb1eca9476",
+    "reference": "HEAD via git ls-remote",
+    "license": {
+      "spdx_id": "MIT",
+      "path": "LICENSE"
+    },
+    "files": [
+      {
+        "path": "README.md",
+        "url": "https://github.com/gastownhall/gastown/blob/466aa41c83ee73b1fa0eb79eb9d172fb1eca9476/README.md",
+        "status": "readable",
+        "sha256": "4ed9c05be3573a5202b85ff232fe698cc2aba857ea6b8f1b943c33c2e685e3b9",
+        "bytes": 30506
+      },
+      {
+        "path": "LICENSE",
+        "url": "https://github.com/gastownhall/gastown/blob/466aa41c83ee73b1fa0eb79eb9d172fb1eca9476/LICENSE",
+        "status": "readable",
+        "sha256": "6141d15e761ef772bdd45fdd4036dfc1f97488011429e6643e1445afa9d22f4d",
+        "bytes": 1068
+      },
+      {
+        "path": "LICENSE.md",
+        "url": "https://github.com/gastownhall/gastown/blob/466aa41c83ee73b1fa0eb79eb9d172fb1eca9476/LICENSE.md",
+        "status": "unavailable",
+        "error": "HTTP Error 404: Not Found"
+      },
+      {
+        "path": "LICENSE.txt",
+        "url": "https://github.com/gastownhall/gastown/blob/466aa41c83ee73b1fa0eb79eb9d172fb1eca9476/LICENSE.txt",
+        "status": "unavailable",
+        "error": "HTTP Error 404: Not Found"
+      },
+      {
+        "path": "docs/overview.md",
+        "url": "https://github.com/gastownhall/gastown/blob/466aa41c83ee73b1fa0eb79eb9d172fb1eca9476/docs/overview.md",
+        "status": "readable",
+        "sha256": "641d47ab737b4e81840e016dc8eb1e68c1f68394fafb8da2a94401cc10e0e5b9",
+        "bytes": 7153
+      }
+    ]
+  }
+]

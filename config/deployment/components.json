@@ -1,0 +1,312 @@
+{
+  "schema_version": "1.0",
+  "activation": "foundation-only",
+  "components": [
+    {
+      "logical_component": "codex-instructions",
+      "canonical_source_path": null,
+      "installed_target_path": null,
+      "provider_runtime": "codex",
+      "source_version": "V1-reference-2026-11-05",
+      "content_hash": null,
+      "deployment_method": "audit-reference-only; no install",
+      "installation_status": "existing-V1",
+      "drift_status": "baseline-recorded",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Keep existing V1; future section-specific backup restore only",
+      "management": "legacy-reference"
+    },
+    {
+      "logical_component": "codex-mcp-and-guards",
+      "canonical_source_path": null,
+      "installed_target_path": null,
+      "provider_runtime": "codex",
+      "source_version": "V1-reference-2026-11-05",
+      "content_hash": null,
+      "deployment_method": "audit-reference-only; no install",
+      "installation_status": "existing-V1",
+      "drift_status": "baseline-recorded",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Keep existing V1; future section-specific backup restore only",
+      "management": "legacy-reference"
+    },
+    {
+      "logical_component": "bridge-config",
+      "canonical_source_path": null,
+      "installed_target_path": null,
+      "provider_runtime": "legacy",
+      "source_version": "V1-reference-2026-11-05",
+      "content_hash": null,
+      "deployment_method": "audit-reference-only; no install",
+      "installation_status": "existing-V1",
+      "drift_status": "baseline-recorded",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Keep existing V1; future section-specific backup restore only",
+      "management": "legacy-reference"
+    },
+    {
+      "logical_component": "bridge-runtime",
+      "canonical_source_path": null,
+      "installed_target_path": null,
+      "provider_runtime": "legacy",
+      "source_version": "V1-reference-2026-11-05",
+      "content_hash": null,
+      "deployment_method": "audit-reference-only; no install",
+      "installation_status": "existing-V1",
+      "drift_status": "baseline-recorded",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Keep existing V1; future section-specific backup restore only",
+      "management": "legacy-reference"
+    },
+    {
+      "logical_component": "sidecar-runtime",
+      "canonical_source_path": null,
+      "installed_target_path": null,
+      "provider_runtime": "legacy",
+      "source_version": "V1-reference-2026-11-05",
+      "content_hash": null,
+      "deployment_method": "audit-reference-only; no install",
+      "installation_status": "existing-V1",
+      "drift_status": "baseline-recorded",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Keep existing V1; future section-specific backup restore only",
+      "management": "legacy-reference"
+    },
+    {
+      "logical_component": "task-store",
+      "canonical_source_path": null,
+      "installed_target_path": null,
+      "provider_runtime": "legacy",
+      "source_version": "V1-reference-2026-11-05",
+      "content_hash": null,
+      "deployment_method": "audit-reference-only; no install",
+      "installation_status": "existing-V1",
+      "drift_status": "baseline-recorded",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Keep existing V1; future section-specific backup restore only",
+      "management": "legacy-reference"
+    },
+    {
+      "logical_component": "check-runner",
+      "canonical_source_path": null,
+      "installed_target_path": null,
+      "provider_runtime": "legacy",
+      "source_version": "V1-reference-2026-11-05",
+      "content_hash": null,
+      "deployment_method": "audit-reference-only; no install",
+      "installation_status": "existing-V1",
+      "drift_status": "baseline-recorded",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Keep existing V1; future section-specific backup restore only",
+      "management": "legacy-reference"
+    },
+    {
+      "logical_component": "prompt-builder",
+      "canonical_source_path": null,
+      "installed_target_path": null,
+      "provider_runtime": "legacy",
+      "source_version": "V1-reference-2026-11-05",
+      "content_hash": null,
+      "deployment_method": "audit-reference-only; no install",
+      "installation_status": "existing-V1",
+      "drift_status": "baseline-recorded",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Keep existing V1; future section-specific backup restore only",
+      "management": "legacy-reference"
+    },
+    {
+      "logical_component": "antigravity-rules",
+      "canonical_source_path": null,
+      "installed_target_path": null,
+      "provider_runtime": "antigravity",
+      "source_version": "V1-reference-2026-11-05",
+      "content_hash": null,
+      "deployment_method": "audit-reference-only; no install",
+      "installation_status": "existing-V1",
+      "drift_status": "baseline-recorded",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Keep existing V1; future section-specific backup restore only",
+      "management": "legacy-reference"
+    },
+    {
+      "logical_component": "antigravity-mcp",
+      "canonical_source_path": null,
+      "installed_target_path": null,
+      "provider_runtime": "antigravity",
+      "source_version": "V1-reference-2026-11-05",
+      "content_hash": null,
+      "deployment_method": "audit-reference-only; no install",
+      "installation_status": "existing-V1",
+      "drift_status": "baseline-recorded",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Keep existing V1; future section-specific backup restore only",
+      "management": "legacy-reference"
+    },
+    {
+      "logical_component": "sidecar-registration",
+      "canonical_source_path": null,
+      "installed_target_path": null,
+      "provider_runtime": "antigravity",
+      "source_version": "V1-reference-2026-11-05",
+      "content_hash": null,
+      "deployment_method": "audit-reference-only; no install",
+      "installation_status": "existing-V1",
+      "drift_status": "baseline-recorded",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Keep existing V1; future section-specific backup restore only",
+      "management": "legacy-reference"
+    },
+    {
+      "logical_component": "antigravity-app-state",
+      "canonical_source_path": null,
+      "installed_target_path": null,
+      "provider_runtime": "antigravity",
+      "source_version": "V1-reference-2026-11-05",
+      "content_hash": null,
+      "deployment_method": "never managed by V2",
+      "installation_status": "app-owned",
+      "drift_status": "baseline-recorded",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Application owns auth, sessions, permissions and settings",
+      "management": "app-owned"
+    },
+    {
+      "logical_component": "v1-private-ledger",
+      "canonical_source_path": null,
+      "installed_target_path": null,
+      "provider_runtime": "legacy",
+      "source_version": "V1-reference-2026-11-05",
+      "content_hash": null,
+      "deployment_method": "never connect, import, copy or dispatch",
+      "installation_status": "app-owned",
+      "drift_status": "not-installed",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "V1 remains sole ledger owner",
+      "management": "app-owned"
+    },
+    {
+      "logical_component": "codex-orchestrator-profile",
+      "canonical_source_path": "agents/generated/codex-native/orchestrator.toml",
+      "installed_target_path": null,
+      "provider_runtime": "codex-native",
+      "source_version": "2.1.0-foundation",
+      "content_hash": "8f2e15740822bfb080297dbdc31eaf206bb1450af7e1b950604c1e11354da22c",
+      "deployment_method": "manual-reviewed-copy-disabled",
+      "installation_status": "not-installed",
+      "drift_status": "not-installed",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Restore/remove only installed owned file",
+      "management": "staged"
+    },
+    {
+      "logical_component": "antigravity-explorer",
+      "canonical_source_path": "agents/generated/antigravity-native/explorer.md",
+      "installed_target_path": null,
+      "provider_runtime": "antigravity-native",
+      "source_version": "2.1.0-foundation",
+      "content_hash": "9c99fd00f6ba888792eb17db98de9277610f2daeddbfa32e78a2d2167d36d64f",
+      "deployment_method": "manual-reviewed-copy-disabled",
+      "installation_status": "not-installed",
+      "drift_status": "not-installed",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Restore/remove only installed owned file",
+      "management": "staged"
+    },
+    {
+      "logical_component": "antigravity-code-reviewer",
+      "canonical_source_path": "agents/generated/antigravity-native/code-reviewer.md",
+      "installed_target_path": null,
+      "provider_runtime": "antigravity-native",
+      "source_version": "2.1.0-foundation",
+      "content_hash": "91ac8a5fe7c8b99aef89bd54b92b99c4383be4ee74f5f69c4581f547a31784c5",
+      "deployment_method": "manual-reviewed-copy-disabled",
+      "installation_status": "not-installed",
+      "drift_status": "not-installed",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Restore/remove only installed owned file",
+      "management": "staged"
+    },
+    {
+      "logical_component": "antigravity-evidence-auditor",
+      "canonical_source_path": "agents/generated/antigravity-native/evidence-auditor.md",
+      "installed_target_path": null,
+      "provider_runtime": "antigravity-native",
+      "source_version": "2.1.0-foundation",
+      "content_hash": "4d6ddbc60c6e9f9c7e6efcf59c215ceceabcdbe2134e35aa85ab5d7cb77d4706",
+      "deployment_method": "manual-reviewed-copy-disabled",
+      "installation_status": "not-installed",
+      "drift_status": "not-installed",
+      "permission_requirements": [
+        "explicit future activation",
+        "backup + section diff + rollback",
+        "verified native permission controls"
+      ],
+      "rollback_method": "Restore/remove only installed owned file",
+      "management": "staged"
+    }
+  ]
+}

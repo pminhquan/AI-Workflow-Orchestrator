@@ -1,0 +1,359 @@
+{
+  "schema_version": "1.0",
+  "claim": "Functional offline evidence only. No measured AI workflow speed or cost improvement.",
+  "live_ai_calls": 0,
+  "comparison_groups": [
+    {
+      "group": "codex-only",
+      "status": "NOT VERIFIED",
+      "measurements": null
+    },
+    {
+      "group": "codex-plus-one-worker",
+      "status": "NOT VERIFIED",
+      "measurements": null
+    },
+    {
+      "group": "codex-plus-two-workers",
+      "status": "NOT VERIFIED",
+      "measurements": null
+    },
+    {
+      "group": "native-teamwork-separate-supported-trial",
+      "status": "NOT VERIFIED",
+      "measurements": null
+    }
+  ],
+  "rows": [
+    {
+      "scenario": "simple-direct",
+      "status": "OFFLINE-TESTED",
+      "timing_kind": "synthetic worker / local functional harness",
+      "harness_elapsed_ms": 26.797300000000007,
+      "local_check_executions": 0,
+      "metrics": {
+        "end_to_end_ms": null,
+        "planning_ms": null,
+        "dispatch_ms": null,
+        "queue_delay_ms": null,
+        "worker_execution_ms": null,
+        "review_wait_ms": null,
+        "verification_ms": null,
+        "integration_ms": null,
+        "retry_count": null,
+        "human_interventions": null,
+        "quality": "functional assertions passed",
+        "tokens": null,
+        "cost": null
+      }
+    },
+    {
+      "scenario": "medium-one-worker",
+      "status": "OFFLINE-TESTED",
+      "timing_kind": "synthetic worker / local functional harness",
+      "harness_elapsed_ms": 181.4753,
+      "local_check_executions": 1,
+      "metrics": {
+        "end_to_end_ms": null,
+        "planning_ms": null,
+        "dispatch_ms": null,
+        "queue_delay_ms": null,
+        "worker_execution_ms": null,
+        "review_wait_ms": null,
+        "verification_ms": null,
+        "integration_ms": null,
+        "retry_count": null,
+        "human_interventions": null,
+        "quality": "functional assertions passed",
+        "tokens": null,
+        "cost": null
+      }
+    },
+    {
+      "scenario": "independent-parallel",
+      "status": "OFFLINE-TESTED",
+      "timing_kind": "synthetic worker / local functional harness",
+      "harness_elapsed_ms": 13.75079999999997,
+      "local_check_executions": 0,
+      "metrics": {
+        "end_to_end_ms": null,
+        "planning_ms": null,
+        "dispatch_ms": null,
+        "queue_delay_ms": null,
+        "worker_execution_ms": null,
+        "review_wait_ms": null,
+        "verification_ms": null,
+        "integration_ms": null,
+        "retry_count": null,
+        "human_interventions": null,
+        "quality": "functional assertions passed",
+        "tokens": null,
+        "cost": null
+      }
+    },
+    {
+      "scenario": "complex-dependency-graph",
+      "status": "OFFLINE-TESTED",
+      "timing_kind": "synthetic worker / local functional harness",
+      "harness_elapsed_ms": 145.93809999999996,
+      "local_check_executions": 1,
+      "metrics": {
+        "end_to_end_ms": null,
+        "planning_ms": null,
+        "dispatch_ms": null,
+        "queue_delay_ms": null,
+        "worker_execution_ms": null,
+        "review_wait_ms": null,
+        "verification_ms": null,
+        "integration_ms": null,
+        "retry_count": null,
+        "human_interventions": null,
+        "quality": "functional assertions passed",
+        "tokens": null,
+        "cost": null
+      }
+    },
+    {
+      "scenario": "worker-unavailable",
+      "status": "OFFLINE-TESTED",
+      "timing_kind": "synthetic worker / local functional harness",
+      "harness_elapsed_ms": 2.081800000000044,
+      "local_check_executions": 0,
+      "metrics": {
+        "end_to_end_ms": null,
+        "planning_ms": null,
+        "dispatch_ms": null,
+        "queue_delay_ms": null,
+        "worker_execution_ms": null,
+        "review_wait_ms": null,
+        "verification_ms": null,
+        "integration_ms": null,
+        "retry_count": null,
+        "human_interventions": null,
+        "quality": "functional assertions passed",
+        "tokens": null,
+        "cost": null
+      }
+    },
+    {
+      "scenario": "unsupported-adapter",
+      "status": "OFFLINE-TESTED",
+      "timing_kind": "synthetic worker / local functional harness",
+      "harness_elapsed_ms": 14.862199999999916,
+      "local_check_executions": 0,
+      "metrics": {
+        "end_to_end_ms": null,
+        "planning_ms": null,
+        "dispatch_ms": null,
+        "queue_delay_ms": null,
+        "worker_execution_ms": null,
+        "review_wait_ms": null,
+        "verification_ms": null,
+        "integration_ms": null,
+        "retry_count": null,
+        "human_interventions": null,
+        "quality": "functional assertions passed",
+        "tokens": null,
+        "cost": null
+      }
+    },
+    {
+      "scenario": "duplicate-submission",
+      "status": "OFFLINE-TESTED",
+      "timing_kind": "synthetic worker / local functional harness",
+      "harness_elapsed_ms": 2.494699999999966,
+      "local_check_executions": 0,
+      "metrics": {
+        "end_to_end_ms": null,
+        "planning_ms": null,
+        "dispatch_ms": null,
+        "queue_delay_ms": null,
+        "worker_execution_ms": null,
+        "review_wait_ms": null,
+        "verification_ms": null,
+        "integration_ms": null,
+        "retry_count": null,
+        "human_interventions": null,
+        "quality": "functional assertions passed",
+        "tokens": null,
+        "cost": null
+      }
+    },
+    {
+      "scenario": "scope-conflict",
+      "status": "OFFLINE-TESTED",
+      "timing_kind": "synthetic worker / local functional harness",
+      "harness_elapsed_ms": 10.8673,
+      "local_check_executions": 0,
+      "metrics": {
+        "end_to_end_ms": null,
+        "planning_ms": null,
+        "dispatch_ms": null,
+        "queue_delay_ms": null,
+        "worker_execution_ms": null,
+        "review_wait_ms": null,
+        "verification_ms": null,
+        "integration_ms": null,
+        "retry_count": null,
+        "human_interventions": null,
+        "quality": "functional assertions passed",
+        "tokens": null,
+        "cost": null
+      }
+    },
+    {
+      "scenario": "stale-checks",
+      "status": "OFFLINE-TESTED",
+      "timing_kind": "synthetic worker / local functional harness",
+      "harness_elapsed_ms": 78.69920000000002,
+      "local_check_executions": 1,
+      "metrics": {
+        "end_to_end_ms": null,
+        "planning_ms": null,
+        "dispatch_ms": null,
+        "queue_delay_ms": null,
+        "worker_execution_ms": null,
+        "review_wait_ms": null,
+        "verification_ms": null,
+        "integration_ms": null,
+        "retry_count": null,
+        "human_interventions": null,
+        "quality": "functional assertions passed",
+        "tokens": null,
+        "cost": null
+      }
+    },
+    {
+      "scenario": "invalid-report",
+      "status": "OFFLINE-TESTED",
+      "timing_kind": "synthetic worker / local functional harness",
+      "harness_elapsed_ms": 5.34170000000006,
+      "local_check_executions": 0,
+      "metrics": {
+        "end_to_end_ms": null,
+        "planning_ms": null,
+        "dispatch_ms": null,
+        "queue_delay_ms": null,
+        "worker_execution_ms": null,
+        "review_wait_ms": null,
+        "verification_ms": null,
+        "integration_ms": null,
+        "retry_count": null,
+        "human_interventions": null,
+        "quality": "functional assertions passed",
+        "tokens": null,
+        "cost": null
+      }
+    },
+    {
+      "scenario": "worker-failure",
+      "status": "OFFLINE-TESTED",
+      "timing_kind": "synthetic worker / local functional harness",
+      "harness_elapsed_ms": 18.435299999999984,
+      "local_check_executions": 0,
+      "metrics": {
+        "end_to_end_ms": null,
+        "planning_ms": null,
+        "dispatch_ms": null,
+        "queue_delay_ms": null,
+        "worker_execution_ms": null,
+        "review_wait_ms": null,
+        "verification_ms": null,
+        "integration_ms": null,
+        "retry_count": null,
+        "human_interventions": null,
+        "quality": "functional assertions passed",
+        "tokens": null,
+        "cost": null
+      }
+    },
+    {
+      "scenario": "retry-exhaustion",
+      "status": "OFFLINE-TESTED",
+      "timing_kind": "synthetic worker / local functional harness",
+      "harness_elapsed_ms": 24.105199999999968,
+      "local_check_executions": 0,
+      "metrics": {
+        "end_to_end_ms": null,
+        "planning_ms": null,
+        "dispatch_ms": null,
+        "queue_delay_ms": null,
+        "worker_execution_ms": null,
+        "review_wait_ms": null,
+        "verification_ms": null,
+        "integration_ms": null,
+        "retry_count": null,
+        "human_interventions": null,
+        "quality": "functional assertions passed",
+        "tokens": null,
+        "cost": null
+      }
+    },
+    {
+      "scenario": "partial-completion",
+      "status": "OFFLINE-TESTED",
+      "timing_kind": "synthetic worker / local functional harness",
+      "harness_elapsed_ms": 15.364100000000008,
+      "local_check_executions": 0,
+      "metrics": {
+        "end_to_end_ms": null,
+        "planning_ms": null,
+        "dispatch_ms": null,
+        "queue_delay_ms": null,
+        "worker_execution_ms": null,
+        "review_wait_ms": null,
+        "verification_ms": null,
+        "integration_ms": null,
+        "retry_count": null,
+        "human_interventions": null,
+        "quality": "functional assertions passed",
+        "tokens": null,
+        "cost": null
+      }
+    },
+    {
+      "scenario": "cancellation",
+      "status": "OFFLINE-TESTED",
+      "timing_kind": "synthetic worker / local functional harness",
+      "harness_elapsed_ms": 4.525700000000029,
+      "local_check_executions": 0,
+      "metrics": {
+        "end_to_end_ms": null,
+        "planning_ms": null,
+        "dispatch_ms": null,
+        "queue_delay_ms": null,
+        "worker_execution_ms": null,
+        "review_wait_ms": null,
+        "verification_ms": null,
+        "integration_ms": null,
+        "retry_count": null,
+        "human_interventions": null,
+        "quality": "functional assertions passed",
+        "tokens": null,
+        "cost": null
+      }
+    },
+    {
+      "scenario": "no-op-validation-reuse",
+      "status": "OFFLINE-TESTED",
+      "timing_kind": "synthetic worker / local functional harness",
+      "harness_elapsed_ms": 147.4783000000001,
+      "local_check_executions": 1,
+      "metrics": {
+        "end_to_end_ms": null,
+        "planning_ms": null,
+        "dispatch_ms": null,
+        "queue_delay_ms": null,
+        "worker_execution_ms": null,
+        "review_wait_ms": null,
+        "verification_ms": null,
+        "integration_ms": null,
+        "retry_count": null,
+        "human_interventions": null,
+        "quality": "functional assertions passed",
+        "tokens": null,
+        "cost": null
+      }
+    }
+  ]
+}

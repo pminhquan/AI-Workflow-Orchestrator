@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "activation": "foundation-only",
+  "live_install": false,
+  "live_dispatch": false,
+  "offline_only": true,
+  "max_parallelism": 2,
+  "max_wait_ms": 1000,
+  "max_retry_budget": 2,
+  "integration_owner": "codex",
+  "state_directory": "state",
+  "security": "Do not change parent security settings. Task scope is checked by the offline harness; native isolation requires separately verified runtime controls."
+}

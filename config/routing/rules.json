@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0",
+  "microtask_size": "small",
+  "delegation_min_expected_benefit": 2,
+  "team_min_independent_units": 2,
+  "team_requires_milestones": true,
+  "fallback": "DIRECT only when all critical capabilities remain available; otherwise BLOCKED"
+}

@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0",
+  "role_id": "implementer",
+  "purpose": "Make the smallest change that satisfies the brief.",
+  "activation_criteria": [
+    "accepted implementation task"
+  ],
+  "required_capabilities": [
+    "read",
+    "write"
+  ],
+  "permissions": {
+    "mode": "task-scope",
+    "read": [
+      "parent-approved"
+    ],
+    "write": [
+      "task-scope"
+    ],
+    "network": "inherit-parent"
+  },
+  "allowed_tools": [
+    "read",
+    "search",
+    "write"
+  ],
+  "input_contract": "task-brief@1.0",
+  "output_contract": "worker-report@1.0",
+  "verification_responsibility": "Preserve concurrent edits, report actual changed files and avoid unrelated refactors.",
+  "escalation_behavior": "Return BLOCKED for missing required capability, unclear ownership or exhausted retry budget. Prompts cannot expand permissions.",
+  "supported_runtimes": [
+    "mock",
+    "replay",
+    "codex-native:conditional",
+    "antigravity-native:conditional"
+  ],
+  "context_requirements": [
+    "goal",
+    "relevant files",
+    "acceptance criteria",
+    "scope",
+    "constraints"
+  ],
+  "source_provenance": [
+    {
+      "repository": "msitarzewski/agency-agents",
+      "path": "engineering/engineering-minimal-change-engineer.md",
+      "reuse": "original concise synthesis of principles; no persona or commands copied",
+      "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+    }
+  ]
+}

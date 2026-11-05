@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "recipe@1.0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "recipe_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$"
+    },
+    "trigger_kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "planning_depth": {
+      "enum": [
+        "minimal",
+        "standard",
+        "milestones"
+      ]
+    },
+    "required_inputs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "suggested_roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "breakdown_strategy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "max_parallelism": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "verification_strategy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recovery_conditions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "completion_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "direct_fallback": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "schema_version",
+    "recipe_id",
+    "trigger_kind",
+    "planning_depth",
+    "required_inputs",
+    "suggested_roles",
+    "breakdown_strategy",
+    "max_parallelism",
+    "acceptance_criteria",
+    "verification_strategy",
+    "recovery_conditions",
+    "completion_criteria",
+    "direct_fallback"
+  ],
+  "additionalProperties": false
+}

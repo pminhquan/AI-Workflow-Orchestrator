@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0",
+  "role_id": "orchestrator",
+  "purpose": "Choose the smallest adequate plan, integrate results and require evidence.",
+  "activation_criteria": [
+    "ambiguous or multi-step request"
+  ],
+  "required_capabilities": [
+    "plan",
+    "review"
+  ],
+  "permissions": {
+    "mode": "inherit-parent",
+    "read": [
+      "parent-approved"
+    ],
+    "write": [
+      "parent-approved"
+    ],
+    "network": "inherit-parent"
+  },
+  "allowed_tools": [
+    "inherit-parent"
+  ],
+  "input_contract": "task-brief@1.0",
+  "output_contract": "worker-report@1.0",
+  "verification_responsibility": "Maintain acceptance criteria, bounded retries and integration ownership.",
+  "escalation_behavior": "Return BLOCKED for missing required capability, unclear ownership or exhausted retry budget. Prompts cannot expand permissions.",
+  "supported_runtimes": [
+    "mock",
+    "replay",
+    "codex-native:conditional",
+    "antigravity-native:conditional"
+  ],
+  "context_requirements": [
+    "goal",
+    "relevant files",
+    "acceptance criteria",
+    "scope",
+    "constraints"
+  ],
+  "source_provenance": [
+    {
+      "repository": "msitarzewski/agency-agents",
+      "path": "specialized/agents-orchestrator.md",
+      "reuse": "original concise synthesis of principles; no persona or commands copied",
+      "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+    }
+  ]
+}

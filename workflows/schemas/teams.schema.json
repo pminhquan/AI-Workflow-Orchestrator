@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "teams@1.0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "enum": [
+              "DIRECT",
+              "DELEGATED",
+              "TEAM"
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "max_workers": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "planning": {
+            "type": "string",
+            "minLength": 1
+          },
+          "requires": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "integration_owner": {
+            "const": "codex"
+          }
+        },
+        "required": [
+          "mode",
+          "roles",
+          "max_workers",
+          "planning",
+          "requires",
+          "integration_owner"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "profiles"
+  ],
+  "additionalProperties": false
+}

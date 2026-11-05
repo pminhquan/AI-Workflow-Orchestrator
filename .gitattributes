@@ -1,0 +1,4 @@
+* text=auto eol=lf
+
+# Publication commits preserve exact verified bytes across platforms.
+* -text

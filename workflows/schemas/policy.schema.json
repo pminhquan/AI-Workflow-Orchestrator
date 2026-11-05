@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "policy@1.0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "activation": {
+      "const": "foundation-only"
+    },
+    "live_install": {
+      "const": false
+    },
+    "live_dispatch": {
+      "const": false
+    },
+    "offline_only": {
+      "const": true
+    },
+    "max_parallelism": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2
+    },
+    "max_wait_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "max_retry_budget": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2
+    },
+    "integration_owner": {
+      "const": "codex"
+    },
+    "state_directory": {
+      "const": "state"
+    },
+    "security": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "schema_version",
+    "activation",
+    "live_install",
+    "live_dispatch",
+    "offline_only",
+    "max_parallelism",
+    "max_wait_ms",
+    "max_retry_budget",
+    "integration_owner",
+    "state_directory",
+    "security"
+  ],
+  "additionalProperties": false
+}

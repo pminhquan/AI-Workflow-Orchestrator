@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "routing-rules@1.0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "microtask_size": {
+      "const": "small"
+    },
+    "delegation_min_expected_benefit": {
+      "type": "number",
+      "minimum": 1
+    },
+    "team_min_independent_units": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 20
+    },
+    "team_requires_milestones": {
+      "const": true
+    },
+    "fallback": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "schema_version",
+    "microtask_size",
+    "delegation_min_expected_benefit",
+    "team_min_independent_units",
+    "team_requires_milestones",
+    "fallback"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "capabilities@1.0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "runtimes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "runtime_id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$"
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "supported_operations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "availability": {
+            "enum": [
+              "available",
+              "unavailable",
+              "unknown"
+            ]
+          },
+          "authentication_mode": {
+            "type": "string",
+            "minLength": 1
+          },
+          "policy_status": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "concurrency": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "verification_support": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cost_usage_observability": {
+            "type": "string",
+            "minLength": 1
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "runtime_id",
+          "provider",
+          "supported_operations",
+          "availability",
+          "authentication_mode",
+          "policy_status",
+          "verified",
+          "enabled",
+          "concurrency",
+          "verification_support",
+          "cost_usage_observability",
+          "notes"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "schema_version",
+    "runtimes"
+  ],
+  "additionalProperties": false
+}

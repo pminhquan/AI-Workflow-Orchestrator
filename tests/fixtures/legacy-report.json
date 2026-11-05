@@ -1,0 +1,7 @@
+{
+  "status": "review",
+  "summary": "Sanitized synthetic V1-shaped report for compatibility testing.",
+  "changed_files": [],
+  "tests": ["node --test synthetic-fixture"],
+  "risks": []
+}

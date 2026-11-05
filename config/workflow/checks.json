@@ -1,0 +1,13 @@
+{
+  "fixture-content": {
+    "args": [
+      "-e",
+      "const fs=require('node:fs');process.exit(fs.readFileSync('sample.txt','utf8')==='offline fixture\\n'?0:1)"
+    ],
+    "inputs": [
+      "sample.txt"
+    ],
+    "timeout_ms": 1000,
+    "cacheable": true
+  }
+}

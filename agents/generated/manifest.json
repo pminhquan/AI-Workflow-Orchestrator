@@ -1,0 +1,325 @@
+{
+  "schema_version": "1.0",
+  "source_version": "2.1.0-foundation",
+  "activation": "staging-only",
+  "results": [
+    {
+      "role_id": "code-reviewer",
+      "target": "mock",
+      "status": "OFFLINE-TESTED",
+      "source": "agents/roles/code-reviewer.json",
+      "source_sha256": "764536d4904ac0744c3457a89b8d1f72c27d714477862d8ece070ca5d4af06ea",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "engineering/engineering-code-reviewer.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "path": "mock/code-reviewer.json",
+      "sha256": "764536d4904ac0744c3457a89b8d1f72c27d714477862d8ece070ca5d4af06ea",
+      "enforcement": "offline host contract validation; not OS isolation",
+      "installed": false
+    },
+    {
+      "role_id": "evidence-auditor",
+      "target": "mock",
+      "status": "OFFLINE-TESTED",
+      "source": "agents/roles/evidence-auditor.json",
+      "source_sha256": "9afc2f6705c9dfd06785ad08f661a22d3a189c7c2118ddd7b881f8d8008b2380",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "testing/testing-evidence-collector.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "path": "mock/evidence-auditor.json",
+      "sha256": "9afc2f6705c9dfd06785ad08f661a22d3a189c7c2118ddd7b881f8d8008b2380",
+      "enforcement": "offline host contract validation; not OS isolation",
+      "installed": false
+    },
+    {
+      "role_id": "explorer",
+      "target": "mock",
+      "status": "OFFLINE-TESTED",
+      "source": "agents/roles/explorer.json",
+      "source_sha256": "ecc7b5fc07ce0ab8ef6b89d7981af44181dbaa67f9b07eaecacd433f87c71549",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "engineering/engineering-multi-agent-systems-architect.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "path": "mock/explorer.json",
+      "sha256": "ecc7b5fc07ce0ab8ef6b89d7981af44181dbaa67f9b07eaecacd433f87c71549",
+      "enforcement": "offline host contract validation; not OS isolation",
+      "installed": false
+    },
+    {
+      "role_id": "implementer",
+      "target": "mock",
+      "status": "OFFLINE-TESTED",
+      "source": "agents/roles/implementer.json",
+      "source_sha256": "762a6709dcee4309024d1a4d23f60534b014065847f2c3a2e58bc83d00d2b111",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "engineering/engineering-minimal-change-engineer.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "path": "mock/implementer.json",
+      "sha256": "762a6709dcee4309024d1a4d23f60534b014065847f2c3a2e58bc83d00d2b111",
+      "enforcement": "offline host contract validation; not OS isolation",
+      "installed": false
+    },
+    {
+      "role_id": "orchestrator",
+      "target": "mock",
+      "status": "OFFLINE-TESTED",
+      "source": "agents/roles/orchestrator.json",
+      "source_sha256": "a38ed84e7dee45ad51a8971e5d551bf1e16abe04f59493020c218c8489ba0808",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "specialized/agents-orchestrator.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "path": "mock/orchestrator.json",
+      "sha256": "a38ed84e7dee45ad51a8971e5d551bf1e16abe04f59493020c218c8489ba0808",
+      "enforcement": "offline host contract validation; not OS isolation",
+      "installed": false
+    },
+    {
+      "role_id": "test-engineer",
+      "target": "mock",
+      "status": "OFFLINE-TESTED",
+      "source": "agents/roles/test-engineer.json",
+      "source_sha256": "894e446900005674e74a7658447d52b36b776612735f6c109ea7c6967958d55b",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "testing/testing-evidence-collector.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "path": "mock/test-engineer.json",
+      "sha256": "894e446900005674e74a7658447d52b36b776612735f6c109ea7c6967958d55b",
+      "enforcement": "offline host contract validation; not OS isolation",
+      "installed": false
+    },
+    {
+      "role_id": "code-reviewer",
+      "target": "codex-native",
+      "status": "UNSUPPORTED",
+      "source": "agents/roles/code-reviewer.json",
+      "source_sha256": "764536d4904ac0744c3457a89b8d1f72c27d714477862d8ece070ca5d4af06ea",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "engineering/engineering-code-reviewer.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "reason": "Codex profiles inherit parent permissions and MCP. Exact per-agent tool/path/write restrictions cannot be encoded safely."
+    },
+    {
+      "role_id": "evidence-auditor",
+      "target": "codex-native",
+      "status": "UNSUPPORTED",
+      "source": "agents/roles/evidence-auditor.json",
+      "source_sha256": "9afc2f6705c9dfd06785ad08f661a22d3a189c7c2118ddd7b881f8d8008b2380",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "testing/testing-evidence-collector.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "reason": "Codex profiles inherit parent permissions and MCP. Exact per-agent tool/path/write restrictions cannot be encoded safely."
+    },
+    {
+      "role_id": "explorer",
+      "target": "codex-native",
+      "status": "UNSUPPORTED",
+      "source": "agents/roles/explorer.json",
+      "source_sha256": "ecc7b5fc07ce0ab8ef6b89d7981af44181dbaa67f9b07eaecacd433f87c71549",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "engineering/engineering-multi-agent-systems-architect.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "reason": "Codex profiles inherit parent permissions and MCP. Exact per-agent tool/path/write restrictions cannot be encoded safely."
+    },
+    {
+      "role_id": "implementer",
+      "target": "codex-native",
+      "status": "UNSUPPORTED",
+      "source": "agents/roles/implementer.json",
+      "source_sha256": "762a6709dcee4309024d1a4d23f60534b014065847f2c3a2e58bc83d00d2b111",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "engineering/engineering-minimal-change-engineer.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "reason": "Codex profiles inherit parent permissions and MCP. Exact per-agent tool/path/write restrictions cannot be encoded safely."
+    },
+    {
+      "role_id": "orchestrator",
+      "target": "codex-native",
+      "status": "NOT VERIFIED",
+      "source": "agents/roles/orchestrator.json",
+      "source_sha256": "a38ed84e7dee45ad51a8971e5d551bf1e16abe04f59493020c218c8489ba0808",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "specialized/agents-orchestrator.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "path": "codex-native/orchestrator.toml",
+      "sha256": "8f2e15740822bfb080297dbdc31eaf206bb1450af7e1b950604c1e11354da22c",
+      "enforcement": "inherits parent; no new permission restrictions promised",
+      "installed": false
+    },
+    {
+      "role_id": "test-engineer",
+      "target": "codex-native",
+      "status": "UNSUPPORTED",
+      "source": "agents/roles/test-engineer.json",
+      "source_sha256": "894e446900005674e74a7658447d52b36b776612735f6c109ea7c6967958d55b",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "testing/testing-evidence-collector.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "reason": "Codex profiles inherit parent permissions and MCP. Exact per-agent tool/path/write restrictions cannot be encoded safely."
+    },
+    {
+      "role_id": "code-reviewer",
+      "target": "antigravity-native",
+      "status": "NOT VERIFIED",
+      "source": "agents/roles/code-reviewer.json",
+      "source_sha256": "764536d4904ac0744c3457a89b8d1f72c27d714477862d8ece070ca5d4af06ea",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "engineering/engineering-code-reviewer.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "path": "antigravity-native/code-reviewer.md",
+      "sha256": "91ac8a5fe7c8b99aef89bd54b92b99c4383be4ee74f5f69c4581f547a31784c5",
+      "enforcement": "documented native tool allowlist; actual inheritance and installed app behavior require separate verification",
+      "installed": false
+    },
+    {
+      "role_id": "evidence-auditor",
+      "target": "antigravity-native",
+      "status": "NOT VERIFIED",
+      "source": "agents/roles/evidence-auditor.json",
+      "source_sha256": "9afc2f6705c9dfd06785ad08f661a22d3a189c7c2118ddd7b881f8d8008b2380",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "testing/testing-evidence-collector.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "path": "antigravity-native/evidence-auditor.md",
+      "sha256": "4d6ddbc60c6e9f9c7e6efcf59c215ceceabcdbe2134e35aa85ab5d7cb77d4706",
+      "enforcement": "documented native tool allowlist; actual inheritance and installed app behavior require separate verification",
+      "installed": false
+    },
+    {
+      "role_id": "explorer",
+      "target": "antigravity-native",
+      "status": "NOT VERIFIED",
+      "source": "agents/roles/explorer.json",
+      "source_sha256": "ecc7b5fc07ce0ab8ef6b89d7981af44181dbaa67f9b07eaecacd433f87c71549",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "engineering/engineering-multi-agent-systems-architect.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "path": "antigravity-native/explorer.md",
+      "sha256": "9c99fd00f6ba888792eb17db98de9277610f2daeddbfa32e78a2d2167d36d64f",
+      "enforcement": "documented native tool allowlist; actual inheritance and installed app behavior require separate verification",
+      "installed": false
+    },
+    {
+      "role_id": "implementer",
+      "target": "antigravity-native",
+      "status": "UNSUPPORTED",
+      "source": "agents/roles/implementer.json",
+      "source_sha256": "762a6709dcee4309024d1a4d23f60534b014065847f2c3a2e58bc83d00d2b111",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "engineering/engineering-minimal-change-engineer.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "reason": "Task-scoped write/check tools require verified host isolation; native frontmatter alone cannot constrain shell or file paths."
+    },
+    {
+      "role_id": "orchestrator",
+      "target": "antigravity-native",
+      "status": "UNSUPPORTED",
+      "source": "agents/roles/orchestrator.json",
+      "source_sha256": "a38ed84e7dee45ad51a8971e5d551bf1e16abe04f59493020c218c8489ba0808",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "specialized/agents-orchestrator.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "reason": "Task-scoped write/check tools require verified host isolation; native frontmatter alone cannot constrain shell or file paths."
+    },
+    {
+      "role_id": "test-engineer",
+      "target": "antigravity-native",
+      "status": "UNSUPPORTED",
+      "source": "agents/roles/test-engineer.json",
+      "source_sha256": "894e446900005674e74a7658447d52b36b776612735f6c109ea7c6967958d55b",
+      "provenance": [
+        {
+          "repository": "msitarzewski/agency-agents",
+          "path": "testing/testing-evidence-collector.md",
+          "reuse": "original concise synthesis of principles; no persona or commands copied",
+          "commit": "b37b5bb33b78f2c1d6567d98e25ca818e3259219"
+        }
+      ],
+      "reason": "Task-scoped write/check tools require verified host isolation; native frontmatter alone cannot constrain shell or file paths."
+    }
+  ]
+}

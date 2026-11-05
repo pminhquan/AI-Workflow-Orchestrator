@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "profiles": [
+    {
+      "mode": "DIRECT",
+      "roles": [
+        "orchestrator"
+      ],
+      "max_workers": 0,
+      "planning": "brief checklist",
+      "requires": [
+        "clear acceptance"
+      ],
+      "integration_owner": "codex"
+    },
+    {
+      "mode": "DELEGATED",
+      "roles": [
+        "orchestrator",
+        "implementer",
+        "code-reviewer"
+      ],
+      "max_workers": 1,
+      "planning": "bounded brief and ownership",
+      "requires": [
+        "verified backend",
+        "clear dependencies",
+        "clear ownership",
+        "expected benefit"
+      ],
+      "integration_owner": "codex"
+    },
+    {
+      "mode": "TEAM",
+      "roles": [
+        "orchestrator",
+        "explorer",
+        "implementer",
+        "test-engineer",
+        "code-reviewer",
+        "evidence-auditor"
+      ],
+      "max_workers": 2,
+      "planning": "milestones and dependency graph",
+      "requires": [
+        "verified backend",
+        "milestones",
+        "bounded parallelism",
+        "structured handoffs",
+        "quality gates"
+      ],
+      "integration_owner": "codex"
+    }
+  ]
+}

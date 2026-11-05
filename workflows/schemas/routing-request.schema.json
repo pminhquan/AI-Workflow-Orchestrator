@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "routing-request@1.0",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "enum": [
+        "fix",
+        "feature",
+        "refactor",
+        "research",
+        "review"
+      ]
+    },
+    "size": {
+      "enum": [
+        "small",
+        "medium",
+        "large"
+      ]
+    },
+    "independent_units": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20
+    },
+    "expected_benefit": {
+      "type": "number",
+      "minimum": 0
+    },
+    "ownership_clear": {
+      "type": "boolean"
+    },
+    "dependencies_clear": {
+      "type": "boolean"
+    },
+    "milestones": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "critical_capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "can_direct": {
+      "type": "boolean"
+    },
+    "runtime_id": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "kind",
+    "size",
+    "independent_units",
+    "expected_benefit",
+    "ownership_clear",
+    "dependencies_clear",
+    "milestones",
+    "critical_capabilities",
+    "can_direct",
+    "runtime_id"
+  ],
+  "additionalProperties": false
+}

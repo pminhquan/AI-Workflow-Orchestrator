@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "compiler-config@1.0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "mock",
+          "codex-native",
+          "antigravity-native"
+        ]
+      },
+      "uniqueItems": true,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "output_directory": {
+      "const": "agents/generated"
+    },
+    "install": {
+      "const": false
+    },
+    "parent_policy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "unsupported": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "schema_version",
+    "targets",
+    "output_directory",
+    "install",
+    "parent_policy",
+    "unsupported"
+  ],
+  "additionalProperties": false
+}

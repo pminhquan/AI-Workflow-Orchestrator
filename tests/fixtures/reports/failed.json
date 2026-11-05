@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "task_id": "sample",
+  "attempt": 1,
+  "status": "failed",
+  "summary": "Fixture reviewed; host must verify.",
+  "changed_files": [],
+  "artifacts": [],
+  "tests": [
+    {
+      "command": "fixture-content",
+      "outcome": "pass"
+    }
+  ],
+  "evidence_refs": [],
+  "known_limitations": [
+    "Synthetic worker; no AI used."
+  ],
+  "risks": [],
+  "blockers": [
+    "fixture limitation"
+  ],
+  "subagent_usage": null
+}

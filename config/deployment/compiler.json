@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "targets": [
+    "mock",
+    "codex-native",
+    "antigravity-native"
+  ],
+  "output_directory": "agents/generated",
+  "install": false,
+  "parent_policy": "app-owned; never overridden by generated profiles",
+  "unsupported": "emit explicit error and no executable artifact for that role/target"
+}

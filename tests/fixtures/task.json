@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "task_id": "sample",
+  "parent_id": null,
+  "trace_id": "offline-demo",
+  "goal": "Verify the fixture workspace without changing live configuration.",
+  "workspace": "tests/fixtures/workspace",
+  "relevant_files": [
+    "sample.txt"
+  ],
+  "dependencies": [],
+  "read_scope": [
+    "sample.txt"
+  ],
+  "write_scope": [],
+  "constraints": [
+    "offline only"
+  ],
+  "acceptance_criteria": [
+    "fixture check passes"
+  ],
+  "required_checks": [
+    "fixture-content"
+  ],
+  "expected_artifacts": [],
+  "allowed_execution_mode": "DELEGATED",
+  "retry_budget": 1
+}

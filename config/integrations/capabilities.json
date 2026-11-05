@@ -1,0 +1,111 @@
+{
+  "schema_version": "1.0",
+  "runtimes": [
+    {
+      "runtime_id": "codex-native",
+      "provider": "OpenAI",
+      "supported_operations": [
+        "direct",
+        "subagents",
+        "skills"
+      ],
+      "availability": "unknown",
+      "authentication_mode": "app-owned",
+      "policy_status": "requires-runtime-preflight",
+      "verified": false,
+      "enabled": false,
+      "concurrency": 0,
+      "verification_support": "not integration-tested",
+      "cost_usage_observability": "unknown",
+      "notes": "Native capability documented; no external launcher implemented or activated. Profiles inherit parent permissions."
+    },
+    {
+      "runtime_id": "antigravity-native",
+      "provider": "Google",
+      "supported_operations": [
+        "subagents",
+        "teamwork",
+        "skills"
+      ],
+      "availability": "unknown",
+      "authentication_mode": "app-owned",
+      "policy_status": "native-app-only",
+      "verified": false,
+      "enabled": false,
+      "concurrency": 0,
+      "verification_support": "not integration-tested",
+      "cost_usage_observability": "unknown",
+      "notes": "Official docs currently use /teamwork; brief referred to /teamwork-preview. No externally callable Teamwork API assumed."
+    },
+    {
+      "runtime_id": "legacy-desktop-bridge",
+      "provider": "local",
+      "supported_operations": [
+        "audit",
+        "offline-replay"
+      ],
+      "availability": "unavailable",
+      "authentication_mode": "app-owned-private",
+      "policy_status": "blocked-consumer-external-dispatch",
+      "verified": false,
+      "enabled": false,
+      "concurrency": 0,
+      "verification_support": "not integration-tested",
+      "cost_usage_observability": "unknown",
+      "notes": "V1 remains live unchanged. V2 never opens its SQLite ledger or starts a sidecar."
+    },
+    {
+      "runtime_id": "gemini-api",
+      "provider": "Google",
+      "supported_operations": [
+        "generate"
+      ],
+      "availability": "unknown",
+      "authentication_mode": "official-api-key-not-configured",
+      "policy_status": "requires-explicit-billing-and-auth",
+      "verified": false,
+      "enabled": false,
+      "concurrency": 0,
+      "verification_support": "not integration-tested",
+      "cost_usage_observability": "unknown",
+      "notes": "Design only; no key or billing created."
+    },
+    {
+      "runtime_id": "mock",
+      "provider": "local",
+      "supported_operations": [
+        "execute",
+        "verify",
+        "parallel",
+        "cancel"
+      ],
+      "availability": "available",
+      "authentication_mode": "none",
+      "policy_status": "allowed-offline",
+      "verified": true,
+      "enabled": true,
+      "concurrency": 2,
+      "verification_support": "host receipts",
+      "cost_usage_observability": "not applicable: offline",
+      "notes": "No AI, subprocess dispatch or network; synthetic worker results only."
+    },
+    {
+      "runtime_id": "replay",
+      "provider": "local",
+      "supported_operations": [
+        "execute",
+        "verify",
+        "cancel"
+      ],
+      "availability": "available",
+      "authentication_mode": "none",
+      "policy_status": "allowed-offline",
+      "verified": true,
+      "enabled": true,
+      "concurrency": 1,
+      "verification_support": "host receipts",
+      "cost_usage_observability": "not applicable: offline",
+      "notes": "Replays sanitized fixture reports; never V1 conversations."
+    }
+  ]
+}
