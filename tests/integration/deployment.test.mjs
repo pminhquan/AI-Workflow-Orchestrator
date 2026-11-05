@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {planInstall,diffConfig,rollbackPlan,inventory,verifyV1} from '../../src/core/deployment.mjs';
 test('install plan is always dry-run and protects all V1 and app-owned components',()=>{
- const plan=planInstall();assert.equal(plan.dry_run,true);assert.equal(plan.activation,'BLOCKED');assert.equal(plan.steps.length,4);assert.ok(plan.protected_components.includes('v1-private-ledger'));assert.ok(plan.steps.every(s=>s.action.includes('no copy')));
+ const plan=planInstall();assert.equal(plan.dry_run,true);assert.equal(plan.activation,'BLOCKED');assert.equal(plan.steps.length,7);assert.ok(plan.protected_components.includes('v1-private-ledger'));assert.ok(plan.steps.every(s=>s.action.includes('no copy')));
 });
 test('audit references are never proposed as replacement config contents',()=>{
  const diff=diffConfig();for(const row of diff.changes.filter(x=>x.method.includes('audit-reference')))assert.equal(row.proposed_hash,null);

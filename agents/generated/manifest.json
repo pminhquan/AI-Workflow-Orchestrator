@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "source_version": "2.1.0-foundation",
+  "source_version": "2.2.0-foundation",
   "activation": "staging-only",
   "results": [
     {
@@ -321,5 +321,24 @@
       ],
       "reason": "Task-scoped write/check tools require verified host isolation; native frontmatter alone cannot constrain shell or file paths."
     }
-  ]
+  ],
+  "native_guidance": {
+    "status": "OFFLINE-TESTED",
+    "execution": "NOT EXECUTED",
+    "custom_discovery": "NOT VERIFIED",
+    "permission_mode": "inherit-parent-advisory",
+    "source": "config/integrations/codex-guidance.json",
+    "source_sha256": "80fc9891a713b88b517663d31c34ebefc1d0a1a5c2842e9bd70abd12944aba39",
+    "files": [
+      "codex-guidance/workflow.md",
+      "codex-guidance/recipes/complex-refactor.json",
+      "codex-guidance/recipes/feature-development.json",
+      "codex-guidance/recipes/research-investigation.json",
+      "codex-guidance/recipes/simple-fix.json",
+      "codex-guidance/recipes/verification-review.json",
+      "codex-guidance/AGENTS.snippet.md",
+      "codex-guidance/awo-reviewer.toml",
+      "codex-guidance/awo-evidence.toml"
+    ]
+  }
 }

@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0",
+  "date": "2026-11-05",
+  "baseline_commit": "2b85de5",
+  "status": "SESSION-VERIFIED",
+  "scope": "native default spawn and returned read-heavy results only",
+  "installed_app": {
+    "package": "OpenAI.Codex",
+    "version": "26.1029.7803.0",
+    "evidence": "Read-only Get-AppxPackage metadata; executable version metadata unavailable"
+  },
+  "invocation": {
+    "tool": "collaboration.spawn_agent",
+    "calls": 2,
+    "model_override": false,
+    "custom_profile_selected": false,
+    "agent_type_selector_available": false,
+    "nested_agents": false,
+    "antigravity_calls": 0
+  },
+  "participants": [
+    {
+      "task_name": "/root/native_routing_smoke",
+      "agent": "default",
+      "work_style": "explorer-like",
+      "brief": "Read mandatory project docs, inspect router/rules/team profiles/capabilities/recipes/tests. Return file:line evidence on routing versus execution, role linkage, DIRECT fallback and native constraints. Read-only, no outside paths, edits, nested agents or AI wrappers. Parent owns implementation/integration.",
+      "returned": true,
+      "findings": [
+        "Router returns recommendation; CLI prints it; scheduler accepts only Mock/Replay.",
+        "Team max_workers bounds routing; role eligibility was not intersected in V2.1.",
+        "Critical capability check precedes DIRECT fallback; native adapters remain disabled."
+      ],
+      "parent_cross_checks": [
+        "src/core/router.mjs",
+        "src/core/config.mjs",
+        "src/core/scheduler.mjs",
+        "agents/teams/profiles.json"
+      ],
+      "worker_reported_targeted_tests": "20/20 routing/compiler tests; secondary claim, independently rerun in final suite"
+    },
+    {
+      "task_name": "/root/native_compiler_smoke",
+      "agent": "default",
+      "work_style": "explorer-like",
+      "brief": "Read mandatory docs; inspect compiler, role definitions, schemas/config/tests and publication allowlist. Return file:line evidence on strict conversions, sole orchestrator Codex output, inherited permissions/models, determinism and minimal advisory mapping. No edits, outside access, nested agents, bridge or state-writing tests.",
+      "returned": true,
+      "findings": [
+        "Only orchestrator satisfies strict Codex inherit-parent conversion; other hard constraints remain unsupported.",
+        "In-memory double render matched staged bytes before implementation; no custom discovery directories present.",
+        "Publication allowlist and artifact counts need updates when profiles are added."
+      ],
+      "parent_cross_checks": [
+        "src/compiler/index.mjs",
+        "agents/roles/orchestrator.json",
+        "agents/roles/explorer.json",
+        "tests/unit/compiler.test.mjs",
+        "config/publication/allowlist.json"
+      ]
+    }
+  ],
+  "evidence_kind": "Parent-authored summary of actual native tool events and returned reports in this conversation; not a signed host receipt or offline scheduler execution record.",
+  "parent_review": "Both reports received. Cross-checked cited code and baseline artifacts before bounded implementation. Actual source conclusions are captured in initial review and final tests.",
+  "source_writes_by_workers": 0,
+  "gui_display": "NOT VERIFIED visually; native tool activity/results observed in chat",
+  "custom_discovery": "NOT VERIFIED",
+  "permission_isolation": "NOT VERIFIED; inherited parent permissions, no per-agent hard boundary claimed",
+  "native_scheduler_adapter": "disabled / NOT VERIFIED",
+  "measurements": {
+    "end_to_end_ms": null,
+    "planning_ms": null,
+    "delegation_ms": null,
+    "integration_review_ms": null,
+    "rework": null,
+    "human_interventions": null,
+    "tokens": null,
+    "cost": null
+  },
+  "performance_claim": null
+}

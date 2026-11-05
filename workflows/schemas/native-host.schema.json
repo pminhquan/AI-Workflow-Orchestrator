@@ -1,0 +1,9 @@
+{
+ "$schema":"https://json-schema.org/draft/2020-12/schema", "$id":"native-host@1.0", "type":"object",
+ "properties":{
+  "runtime_id":{"type":"string","minLength":1},"invocation_available":{"type":"boolean"},"delegation_allowed":{"type":"boolean"},"max_workers":{"type":"integer","minimum":0,"maximum":2},
+  "supported_operations":{"type":"array","uniqueItems":true,"items":{"enum":["direct","read","search","write","check","plan","review","subagents","parallel"]}},
+  "custom_agents":{"type":"array","uniqueItems":true,"items":{"type":"string","pattern":"^awo-[a-z][a-z-]{0,40}$"}}
+ },
+ "required":["runtime_id","invocation_available","delegation_allowed","max_workers","supported_operations","custom_agents"],"additionalProperties":false
+}

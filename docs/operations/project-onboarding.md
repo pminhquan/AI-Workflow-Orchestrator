@@ -1,0 +1,13 @@
+# Project-local onboarding — prepare only
+
+Keep canonical definitions here. For a Web, Backend, AI/ML or personal coding project, prepare a JSON spec with `schema_version: "1.0"`, a new `project_id`, existing `project_root` (absolute or canonical-relative), and reviewed `validation_commands`. Commands are text in the bundle, never executed by generation. Do not include secrets. See `tests/fixtures/project-bundle.json` for a Backend fixture.
+
+1. Run `node src/cli.mjs bundle-plan <spec.json>`. This dry-run only inspects the declared instruction/profile paths and displays proposed additions/hashes/diff. Any existing AGENTS.md requires manual section merge. Any existing `.codex/agents` directory marks profiles CONFLICT; existing files are never overwritten. Links/junctions are rejected.
+2. Run `node src/cli.mjs bundle-stage <spec.json>` to prepare immutable `state/bundles/<project_id>/`. The compiler renders all content from canonical sources. A changed staging file or changed canonical inputs blocks reuse; keep it and choose a new project_id. No target install occurs.
+3. For a separately authorized opt-in, review the exact scope, backup target instruction sections and hashes, inspect diff and fresh checks, and follow [activation runbook](migration-rollback.md). Merge the staged snippet into existing AGENTS.md; copy only approved new `.workflow-orchestrator` guidance/recipe files and optional profiles when no collision exists. No global config change is needed. This task performs none of those installation steps on another project.
+4. Start a fresh Codex Desktop project session. Confirm which instructions apply and whether optional custom profiles are actually discovered. Assign ordinary small work; expect DIRECT. For a bounded read-only independent inspection, native workers should return inspectable results; if unavailable use safe DIRECT or report the missing critical requirement.
+5. Parent verifies source, diff, acceptance and tests. Preserve the native participation evidence separately from offline receipts.
+
+Rollback before install: nothing to restore in target. After separately approved opt-in: remove only owned added files still matching the recorded bundle hashes; restore only the reviewed instruction section from backup. Preserve concurrent edits and user agents/config. Never replace whole AGENTS.md or `.codex/agents` wholesale.
+
+Updates: change rules/recipes/native mappings in canonical; run tests, compile twice and validate. Generate a new project_id, compare old/new manifests and proposals, then separately opt in per project. No auto-update, dashboard, sidecar or copying of the whole framework. For custom-profile collisions keep existing profiles and use built-ins/default until a deliberate merge is reviewed.

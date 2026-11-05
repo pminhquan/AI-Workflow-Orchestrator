@@ -23,3 +23,7 @@ Generated drift: đọc diff và bảo tồn chỉnh sửa tay; cập nhật can
 Offline store sử dụng exclusive `store.lock`; chỉ một writer. Sau hard crash, xác minh process đã dừng trước khi xóa riêng stale lock, giữ `store.json`; gọi `recover()` để chuyển interrupted running sang BLOCKED. Không tự dispatch lại task outcome không chắc chắn. Không tái sử dụng worker tokens/transcripts từ V1.
 
 Receipts không persisted như quyền tin cậy qua restart: rerun registered check khi resume review. Retry/rework phải explicit và không vượt budget. Không có daemon sau khi CLI thoát.
+
+## V2.2 additions
+
+`native-guide <request.json> <host-observation.json>` returns pure host-native planning advice with `execution: NOT EXECUTED`; it never spawns, creates receipts or updates capabilities. Observations are caller data, not runtime attestations. `bundle-plan <project.json>` previews additions/conflicts and `bundle-stage <project.json>` prepares immutable output only under ignored `state/bundles/`. Neither installs, merges, reloads or writes global config. See [onboarding](project-onboarding.md).

@@ -17,8 +17,11 @@
       "mode": "DELEGATED",
       "roles": [
         "orchestrator",
+        "explorer",
         "implementer",
-        "code-reviewer"
+        "test-engineer",
+        "code-reviewer",
+        "evidence-auditor"
       ],
       "max_workers": 1,
       "planning": "bounded brief and ownership",

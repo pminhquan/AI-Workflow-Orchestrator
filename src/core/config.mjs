@@ -17,5 +17,13 @@ export function loadConfig(){
  requireValid(readJSON(resolve(ROOT,'config/deployment/compiler.json')),'compiler-config');
  const components=requireValid(readJSON(resolve(ROOT,'config/deployment/components.json')),'components').components;
  if(new Set(components.map(x=>x.logical_component)).size!==components.length)throw Error('Duplicate component');
- return {roles,recipes,capabilities,profiles,policy,routing};
+ const native=requireValid(readJSON(resolve(ROOT,'config/integrations/codex-guidance.json')),'native-guidance');
+ if(new Set(native.role_map.map(x=>x.role_id)).size!==roles.length||new Set(native.profiles.map(x=>x.name)).size!==native.profiles.length)throw Error('Duplicate native role/profile');
+ for(const mapping of native.role_map){
+  if(!roles.some(r=>r.role_id===mapping.role_id))throw Error('Unknown native role');
+  if(!['parent','default','explorer','worker',...native.profiles.map(p=>p.name)].includes(mapping.agent))throw Error('Unknown native agent');
+  if((mapping.role_id==='orchestrator')!==(mapping.agent==='parent'))throw Error('Orchestrator must remain parent');
+ }
+ for(const p of native.profiles)if(!roles.some(r=>r.role_id===p.role_id)||!native.role_map.some(m=>m.role_id===p.role_id&&m.agent===p.name))throw Error('Unmapped native profile');
+ return {roles,recipes,capabilities,profiles,policy,routing,native};
 }

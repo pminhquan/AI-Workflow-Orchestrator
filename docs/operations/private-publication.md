@@ -4,7 +4,7 @@ Canonical project → sanitized export → GitHub PRIVATE. The canonical project
 
 ## Export and freshness
 
-Run from the canonical project, supplying a separate directory outside it:
+Run from the canonical project, supplying a separate directory outside it or the guarded ignored staging directory described below:
 
 ```powershell
 node scripts/publication.mjs export '<PUBLICATION_DIRECTORY>'
@@ -42,3 +42,7 @@ First review fresh canonical/export test results and security scan. Obtain the a
 Only after explicit publication approval, initialize the exported directory with clean history, configure its local identity, add the verified export files and commit. Use command-scoped ID+login noreply author/committer identity as well so environment overrides cannot leak another email. Run canonical `verify` again; it checks publication branch/tag history. Create the remote explicitly PRIVATE, inspect the GitHub API visibility before pushing only `refs/heads/main:refs/heads/main`, with followTags disabled. Verify remote HEAD, file inventory and visibility after push. Never mirror or push all refs; preserve GitHub secret-protection failures. Creating or pushing remains a separate approval gate.
 
 For later updates: edit canonical → tests/validate → commit reviewed canonical changes if desired → export into the owned publication directory → full tests with known environment limitations reported → fresh `verify` → inspect export diff → commit only the derived changes using local noreply identity → fresh `verify` of snapshot and publication history → explicitly approved push of main → verify remote SHA. No GitHub-to-canonical or publication-to-canonical source sync is permitted. A new source file requires a policy decision, not automatic wildcard inclusion.
+
+## V2.2 local review staging
+
+For this release all writes stay in canonical root. Export to guarded ignored `state/publication/v22-review` with the existing exporter, then run verify and security/freshness checks. Only a single lowercase named child of `state/publication/` is permitted inside canonical; source paths, the root and nested destinations remain forbidden. The directory is excluded from publication inventory by the existing state ignore rule. It is a sanitized review artifact, not an installed project or an automatic GitHub update. Keep a before/after manifest diff in ignored state. No remote or push is created.

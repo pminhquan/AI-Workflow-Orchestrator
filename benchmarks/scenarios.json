@@ -19,10 +19,10 @@
     "no-op-validation-reuse"
   ],
   "comparison_groups": [
-    "codex-only",
-    "codex-plus-one-worker",
-    "codex-plus-two-workers",
-    "native-teamwork-separate-supported-trial"
+    "A-codex-direct",
+    "B-codex-native-delegated",
+    "C-codex-native-team",
+    "D-official-external-api-future"
   ],
   "metrics": [
     "end_to_end_ms",

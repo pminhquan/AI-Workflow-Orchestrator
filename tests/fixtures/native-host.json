@@ -1,0 +1,8 @@
+{
+ "runtime_id":"codex-native",
+ "invocation_available":true,
+ "delegation_allowed":true,
+ "max_workers":2,
+ "supported_operations":["direct","read","search","write","check","plan","review","subagents","parallel"],
+ "custom_agents":[]
+}

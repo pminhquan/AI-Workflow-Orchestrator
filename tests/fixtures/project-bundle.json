@@ -1,0 +1,6 @@
+{
+ "schema_version":"1.0",
+ "project_id":"example-backend-v22",
+ "project_root":"tests/fixtures/coding-project",
+ "validation_commands":["node --test"]
+}

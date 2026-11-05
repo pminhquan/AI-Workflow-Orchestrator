@@ -179,7 +179,10 @@ export function verifyPublicationHistory(destination) {
 
 function assertDestination(destination, canonicalRoot) {
   destination = resolve(destination); canonicalRoot = realpathSync(canonicalRoot);
-  if (inside(destination, canonicalRoot) || inside(canonicalRoot, destination)) throw Error('Use a separate publication directory outside the canonical repository');
+  const localStage = relative(canonicalRoot, destination).split(sep).join('/');
+  const guardedStage = /^state\/publication\/[a-z][a-z0-9-]{0,60}$/.test(localStage);
+  if (inside(destination, canonicalRoot) || inside(canonicalRoot, destination) && !guardedStage) throw Error('Use a separate publication directory or guarded state/publication/<name> staging');
+  if (guardedStage) scopedPath(canonicalRoot, localStage);
   let ancestor = destination;
   while (!existsSync(ancestor)) ancestor = dirname(ancestor);
   if (lstatSync(ancestor).isSymbolicLink() || realpathSync(ancestor).toLowerCase() !== ancestor.toLowerCase()) throw Error('Destination ancestors must not contain links');

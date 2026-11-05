@@ -93,6 +93,11 @@ test('publication is deterministic, preserves source bytes and creates no Git hi
   assert.equal(verifyOutput(output, second).status, 'OFFLINE-TESTED');
   writeOutput(output, second, canonical); assert.deepEqual(readFileSync(resolve(output, MANIFEST)), first.files[MANIFEST]);
 }));
+test('publication allows only guarded ignored staging inside canonical', () => fixture(({canonical, plan}) => {
+  const output=resolve(canonical,'state/publication/v22-review');
+  writeOutput(output,plan(),canonical);assert.equal(verifyOutput(output,plan()).status,'OFFLINE-TESTED');
+  for(const bad of [canonical,resolve(canonical,'src/export'),resolve(canonical,'state/publication'),resolve(canonical,'state/publication/v22/nested')])assert.throws(()=>writeOutput(bad,plan(),canonical),/separate publication/);
+}));
 test('publication detects stale canonical inputs and refreshes only owned output', () => fixture(({canonical, output, plan, put}) => {
   const first = plan(); writeOutput(output, first, canonical);
   put('src/example.mjs', 'export const answer = 43;\n'); const next = plan();

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.2.0-foundation — 2026-11-05
+
+- Audit V2.1; add native Codex instructions, pure guidance and bounded role selection while preserving offline-only scheduler execution.
+- Stage two advisory review profiles and a lightweight project-local bundle with dry-run/diff/collision protection and rollback guidance; no installation/global config writes.
+- Complete one two-agent read-heavy native smoke; custom profile discovery and native scheduler adapter remain unverified.
+- Preserve V1 drift gate and baseline; distinguish missing baseline, pre-existing drift and V2 regression. Prepare sanitized publication staging without pushing.
+
 ## 2.1.0-foundation — 2026-11-05
 
 - Tạo canonical configuration, sáu curated roles, ba adaptive modes và năm recipes.

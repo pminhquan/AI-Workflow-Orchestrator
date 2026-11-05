@@ -307,6 +307,60 @@
       ],
       "rollback_method": "Restore/remove only installed owned file",
       "management": "staged"
+    },
+    {
+      "logical_component": "codex-native-reviewer",
+      "canonical_source_path": "agents/generated/codex-guidance/awo-reviewer.toml",
+      "installed_target_path": null,
+      "provider_runtime": "codex-native",
+      "source_version": "2.2.0-foundation",
+      "content_hash": "592677666a3b22054788648bc4358df21c4d52bccd8779b68bb5d9097b097cc3",
+      "deployment_method": "manual-reviewed-copy-disabled",
+      "installation_status": "not-installed",
+      "drift_status": "not-installed",
+      "permission_requirements": [
+        "explicit per-project opt-in",
+        "backup + section diff + fresh checks + rollback",
+        "parent permissions; advisory ownership only; no hard isolation"
+      ],
+      "rollback_method": "Remove only owned unchanged additions; restore reviewed instruction section; preserve concurrent edits",
+      "management": "staged"
+    },
+    {
+      "logical_component": "codex-native-evidence",
+      "canonical_source_path": "agents/generated/codex-guidance/awo-evidence.toml",
+      "installed_target_path": null,
+      "provider_runtime": "codex-native",
+      "source_version": "2.2.0-foundation",
+      "content_hash": "bcbe8858a227b655b7421469c5c9e60b393609963a527704a66d11b75ab67779",
+      "deployment_method": "manual-reviewed-copy-disabled",
+      "installation_status": "not-installed",
+      "drift_status": "not-installed",
+      "permission_requirements": [
+        "explicit per-project opt-in",
+        "backup + section diff + fresh checks + rollback",
+        "parent permissions; advisory ownership only; no hard isolation"
+      ],
+      "rollback_method": "Remove only owned unchanged additions; restore reviewed instruction section; preserve concurrent edits",
+      "management": "staged"
+    },
+    {
+      "logical_component": "codex-delegation-guidance",
+      "canonical_source_path": "agents/generated/codex-guidance/workflow.md",
+      "installed_target_path": null,
+      "provider_runtime": "codex-native",
+      "source_version": "2.2.0-foundation",
+      "content_hash": "598d50dbad6cd71c8fa70d6665890f56084716b050e0b0fad0eb69befdd0eccf",
+      "deployment_method": "manual-reviewed-copy-disabled",
+      "installation_status": "not-installed",
+      "drift_status": "not-installed",
+      "permission_requirements": [
+        "explicit per-project opt-in",
+        "backup + section diff + fresh checks + rollback",
+        "parent permissions; advisory ownership only; no hard isolation"
+      ],
+      "rollback_method": "Remove only owned unchanged additions; restore reviewed instruction section; preserve concurrent edits",
+      "management": "staged"
     }
   ]
 }

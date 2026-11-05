@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "recipe_id": "complex-refactor",
+  "trigger_kind": "refactor",
+  "planning_depth": "milestones",
+  "required_inputs": [
+    "invariants",
+    "milestones",
+    "dependency graph"
+  ],
+  "suggested_roles": [
+    "explorer",
+    "implementer",
+    "test-engineer",
+    "code-reviewer"
+  ],
+  "breakdown_strategy": "dependency-ordered migrations",
+  "max_parallelism": 2,
+  "acceptance_criteria": [
+    "scope agreed",
+    "required checks pass",
+    "limitations disclosed"
+  ],
+  "verification_strategy": "invariant checks at milestones",
+  "recovery_conditions": [
+    "failed check: bounded rework",
+    "unavailable worker: DIRECT if critical requirements survive",
+    "scope violation: BLOCKED"
+  ],
+  "completion_criteria": [
+    "accepted artifacts",
+    "fresh evidence",
+    "integration owner review"
+  ],
+  "direct_fallback": true
+}

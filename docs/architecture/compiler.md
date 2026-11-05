@@ -18,6 +18,8 @@ Validate role → validate tool/permission representation → render stable byte
 
 Tổng: 10 profile artifacts, một generation manifest và một checksum index. Có 8 kết quả UNSUPPORTED trong 18 role-target combinations. Một role không support không ngăn việc compile các combination an toàn khác; CLI trả ma trận kết quả rõ ràng, không coi các lỗi này là successful conversion.
 
+V2.2 thêm 9 artifacts trong `codex-guidance/`: guide, AGENTS snippet, năm recipes chọn đọc theo nhu cầu và hai advisory review TOML. Chúng đi qua cùng compiler/checksum/drift gate, không phải chuyển đổi lossless các hard-constraint roles. Tổng payload hiện là 19, ngoài manifest/index. `native_guidance` trong manifest ghi `execution: NOT EXECUTED`, custom discovery NOT VERIFIED. Profile names có prefix `awo-`, không che built-ins. Bundle dùng output của canonical compiler, không tự sửa generated source.
+
 ## Provider constraints đã kiểm tra từ tài liệu
 
 Theo [OpenAI Subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents), custom agent TOML yêu cầu `name`, `description`, `developer_instructions`; sandbox và approval settings theo parent. Vì vậy compiler không phát `sandbox_mode` như một per-agent security gate. Upstream adapter wshobson vẫn phát heuristic này tại commit đã pin; cách đó bị reject trong project này.

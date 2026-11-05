@@ -3,6 +3,7 @@ import {dirname,resolve} from 'node:path';
 import {ROOT,sha256,canonical,scopedPath,readJSON,writeJSON} from '../core/util.mjs';
 import {requireValid} from '../core/schema.mjs';
 import {loadConfig} from '../core/config.mjs';
+import {buildNativeArtifacts} from '../native/guidance.mjs';
 const unsupported=reason=>({status:'UNSUPPORTED',reason});
 const instructions=role=>[role.purpose,role.verification_responsibility,role.escalation_behavior,'Use the task-brief@1.0 and worker-report@1.0 contracts. Parent permissions remain authoritative.'].join('\n');
 export function convert(role,target){
@@ -31,7 +32,8 @@ export function buildArtifacts(config=loadConfig()){
   else entry.reason=converted.reason;
   results.push(entry);
  }
- files['manifest.json']=JSON.stringify({schema_version:'1.0',source_version:'2.1.0-foundation',activation:'staging-only',results},null,2)+'\n';
+ const guidance=buildNativeArtifacts(config);Object.assign(files,guidance);
+ files['manifest.json']=JSON.stringify({schema_version:'1.0',source_version:'2.2.0-foundation',activation:'staging-only',results,native_guidance:{status:'OFFLINE-TESTED',execution:'NOT EXECUTED',custom_discovery:'NOT VERIFIED',permission_mode:config.native.permission_mode,source:'config/integrations/codex-guidance.json',source_sha256:sha256(config.native),files:Object.keys(guidance)}},null,2)+'\n';
  return files;
 }
 export function generatedDrift(config=loadConfig()){

@@ -7,7 +7,7 @@ const roles=loadConfig().roles;
 test('compiler outputs deterministic bytes, checksums and provenance',()=>{
  const a=buildArtifacts(),b=buildArtifacts();assert.deepEqual(a,b);const m=JSON.parse(a['manifest.json']);
  for(const r of m.results.filter(x=>x.path)){assert.equal(r.sha256,sha256(a[r.path]));assert.equal(r.provenance[0].commit.length,40);}
- assert.equal(m.results.length,18);assert.equal(Object.keys(a).length,11);
+ assert.equal(m.results.length,18);assert.equal(m.results.filter(r=>r.path).length,10);assert.equal(m.native_guidance.files.length,9);assert.equal(Object.keys(a).length,20);assert.equal(m.native_guidance.execution,'NOT EXECUTED');assert.equal(m.native_guidance.custom_discovery,'NOT VERIFIED');
 });
 test('Codex native TOML is generated only for inherited parent constraints',()=>{
  const role=roles.find(r=>r.role_id==='orchestrator');const r=convert(role,'codex-native');assert.equal(r.status,'NOT VERIFIED');assert.match(r.content,/developer_instructions =/);assert.doesNotMatch(r.content,/sandbox_mode|approval_policy/);

@@ -49,6 +49,12 @@ Năm recipe định nghĩa activation, planning depth, inputs, roles, decomposit
 
 Nếu critical capability mất thì BLOCKED. DIRECT fallback chỉ được phép khi request cho phép và không làm mất yêu cầu quan trọng. Không chọn adapter disabled/unverified. Mọi native executor hiện vẫn disabled dù format được tài liệu mô tả.
 
+## V2.2 host-native guidance
+
+`src/native/guidance.mjs` là pure recommendation riêng với `execution: NOT EXECUTED`; caller-supplied host observations không phải security attestation. Nó dùng cùng thresholds, recipes, team eligibility và concurrency limits; không gọi scheduler hoặc AI API, không sửa capability registry. Native Codex trong parent session sở hữu lifecycle và báo kết quả trực tiếp. Smoke trong phiên hiện tại chứng minh hai default subagents đã tham gia; không chứng minh registry adapter, custom discovery hoặc permission isolation.
+
+`config/integrations/codex-guidance.json` map sáu logical roles sang parent, built-ins và hai advisory review profiles. Strict converter vẫn từ chối hard constraints không thể biểu diễn. Hai profile không phải conversion bảo toàn read-only/task-scoped permissions. Compiler tạo guidance/profile staging; bundle planner chỉ inspect declared project paths, báo collision/diff và stage trong ignored state. Không có installer, global config write hoặc duplicate dispatcher. Matching recipe được đọc theo nhu cầu; không load toàn bộ framework cho task nhỏ.
+
 ## State và reliability
 
 Một store mới riêng dưới project `state/`; không dùng SQLite V1. Stable idempotency key gắn hash payload, duplicate task ID/cycle/dependency không tồn tại bị từ chối atomically. Reader/writer scope conflicts giữ task queued; task review giữ ownership đến khi accept/rework. Bounded wait không tự redispatch. Failed task cần explicit retry trong budget tối đa hai rework.
