@@ -64,3 +64,18 @@ Một store mới riêng dưới project `state/`; không dùng SQLite V1. Stabl
 Restart giữ queued/review/failure state. Task đang running được `recover()` chuyển BLOCKED vì delivery/outcome chưa chắc chắn. Receipts cache nằm trong process host; sau restart cần chạy check lại. Lock bị bỏ lại sau hard crash không tự xóa: người vận hành xác minh không còn writer trước khi dọn riêng lock. State không được chứng nhận chống sửa bởi user/process cùng tài khoản.
 
 Cancellation dừng adapter mock hợp tác với AbortSignal, không tuyên bố dừng agent native. Integration/merge và planning/dispatch AI cost chưa được triển khai; metrics không đo được phải là null.
+
+## Disabled Desktop inbox candidate
+
+`src/desktop-inbox/` is a separate, explicitly requested file handoff candidate, not another agent scheduler: no DAG, retry engine, native lifecycle owner or SQLite ledger. It does not enable a runtime in the routing registry. One configured inbox binds one canonical workspace/project; atomic publication/claim and durable dispatch intent prevent ordinary duplicate attempts. Uncertain delivery retains the workspace slot and is never automatically resubmitted.
+
+The original foundation runner executes only a local mock fixture. Its App-owned Sidecar manifest and disabled configuration fragment are review artifacts, not registration. Its live gate remains blocked pending policy, installed-runtime and supported target evidence. A configured conversation ID is different from discovering the focused Desktop chat. Worker reports and parent receipts remain separate, and only fresh parent checks plus source/findings review reach VERIFIED. This status in a mock run does not establish real Desktop execution. See [contracts, evidence and activation gates](../audit/desktop-inbox-bridge.md).
+
+The later explicitly requested MCP pilot stages a separate App-owned one-shot
+receiver using documented new-conversation routing, with a hash-bound parent
+review of official App project/folder evidence. It is not installed or enabled.
+Project stdio MCP only queues/reads existing inbox records; a bounded parent
+result watcher reuses existing verification and cannot dispatch. The original
+mock runner/live gate and V2 native delegation remain independent. See
+[current pilot controls](../operations/desktop-mcp-relay.md); no real dispatch is
+claimed without App outcome and independent result verification.

@@ -1,3 +1,3 @@
-# Native delegation opt-in
+# Native & Desktop GUI delegation opt-in
 
-For this project, use native Codex subagents when useful under `.workflow-orchestrator/workflow.md`: DIRECT for simple work, one independent brief for DELEGATED, bounded TEAM for independent milestones. Read that file for substantive work, then only the matching recipe. Parent owns integration and verification. If unavailable, fall back safely or report BLOCKED. Permissions remain inherited. Do not use Antigravity external dispatch.
+For this project, Codex acts as orchestrator under `.workflow-orchestrator/workflow.md`: DIRECT for simple work, one independent brief for DELEGATED, bounded TEAM for independent milestones, and—when the project-local `desktop_inbox` MCP server is enabled—bounded read/write job dispatch to the open Antigravity Desktop GUI (`bridge_status` -> `submit_job` -> `wait_job` -> `verify_job`). Read that file for substantive work, then only the matching recipe. Parent owns integration and verification. If unavailable, fall back safely or report BLOCKED. Permissions remain inherited.

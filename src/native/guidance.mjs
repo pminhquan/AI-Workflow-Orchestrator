@@ -34,7 +34,7 @@ export function renderNativeGuidance(config){
  const lines=[
   '# Native Codex workflow — generated; canonical source owns updates',
   '',
-  'This project instruction requests native subagents only when independent work has a clear benefit. Use the smallest adequate plan. Native Codex owns spawn/wait/results; do not call the offline scheduler, MCP, agentapi or another AI wrapper to dispatch. No dashboard or sidecar.',
+  'This project instruction uses Codex as orchestrator (Boss): handle microtasks DIRECT, delegate bounded work via native subagents, or—when the project-local desktop_inbox MCP server is enabled—dispatch bounded read/write jobs into the open Antigravity Desktop GUI conversation via bridge_status -> submit_job -> wait_job -> verify_job. Do not call the offline scheduler or legacy V1 SQLite bridge.',
   '',
   `DIRECT: small scope, unclear ownership/dependencies or expected benefit below ${config.routing.delegation_min_expected_benefit}: parent does the work, no subagent, short checklist and appropriate checks.`,
   `DELEGATED: one bounded independent brief, clear ownership/dependencies, useful benefit at or above ${config.routing.delegation_min_expected_benefit}. Parent integrates and verifies.`,
@@ -58,7 +58,7 @@ export function renderNativeGuidance(config){
 export function buildNativeArtifacts(config){
  const files={'codex-guidance/workflow.md':renderNativeGuidance(config)};
  for(const r of config.recipes)files[`codex-guidance/recipes/${r.recipe_id}.json`]=JSON.stringify(r,null,2)+'\n';
- files['codex-guidance/AGENTS.snippet.md']='# Native delegation opt-in\n\nFor this project, use native Codex subagents when useful under `.workflow-orchestrator/workflow.md`: DIRECT for simple work, one independent brief for DELEGATED, bounded TEAM for independent milestones. Read that file for substantive work, then only the matching recipe. Parent owns integration and verification. If unavailable, fall back safely or report BLOCKED. Permissions remain inherited. Do not use Antigravity external dispatch.\n';
+ files['codex-guidance/AGENTS.snippet.md']='# Native & Desktop GUI delegation opt-in\n\nFor this project, Codex acts as orchestrator under `.workflow-orchestrator/workflow.md`: DIRECT for simple work, one independent brief for DELEGATED, bounded TEAM for independent milestones, and—when the project-local `desktop_inbox` MCP server is enabled—bounded read/write job dispatch to the open Antigravity Desktop GUI (`bridge_status` -> `submit_job` -> `wait_job` -> `verify_job`). Read that file for substantive work, then only the matching recipe. Parent owns integration and verification. If unavailable, fall back safely or report BLOCKED. Permissions remain inherited.\n';
  for(const p of config.native.profiles){
   const text=[`Use when: ${p.when}`,`Do not use when: ${p.not_when}`,`Input brief: ${p.brief}`,`Output: ${p.output}`,`Verification: ${p.verification}`,`Ownership: ${p.ownership}`,'No nested agents. Parent permissions, model configuration, provider and MCP remain authoritative. This advisory profile does not implement the canonical role hard constraints.'].join('\n');
   files[`codex-guidance/${p.name}.toml`]=`# Staged advisory profile; discovery and permissions require host verification.\nname = ${JSON.stringify(p.name)}\ndescription = ${JSON.stringify(p.when)}\ndeveloper_instructions = ${JSON.stringify(text)}\n`;

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Untrusted desktop worker report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "task_id", "attempt_id", "workspace", "status", "inspected_files", "changed_files", "tests", "findings", "blockers", "errors", "evidence"],
+  "properties": {
+    "schema_version": {"const": "desktop-inbox.report@1"},
+    "task_id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"},
+    "attempt_id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"},
+    "workspace": {"type": "string", "minLength": 1},
+    "status": {"enum": ["reported", "blocked", "failed"]},
+    "inspected_files": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "changed_files": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "tests": {
+      "type": "array", "maxItems": 16,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["command", "exit_code", "output"],
+        "properties": {"command": {"type": "string", "minLength": 1}, "exit_code": {"type": ["integer", "null"]}, "output": {"type": "string"}}
+      }
+    },
+    "findings": {"type": "array", "maxItems": 32, "items": {"type": "string", "minLength": 1}},
+    "blockers": {"description": "Unmet prerequisites; never an alias for execution errors.", "type": "array", "maxItems": 32, "items": {"type": "string", "minLength": 1}},
+    "errors": {"description": "Worker-declared execution errors, explicitly empty if none were declared.", "type": "array", "maxItems": 32, "items": {"type": "string", "minLength": 1}},
+    "evidence": {"description": "Worker evidence references; not host receipts or independent App attribution.", "type": "array", "maxItems": 32, "items": {"type": "string", "minLength": 1}}
+  }
+}

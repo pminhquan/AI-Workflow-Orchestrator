@@ -67,3 +67,37 @@ node src/cli.mjs bundle-stage tests/fixtures/project-bundle.json
 V1 có checksum drift đã tồn tại trước V2.2. `test`, `doctor` và `verify-v1` tiếp tục báo lỗi gate này; không cập nhật baseline để đạt PASS. [V2.2 verification](docs/audit/v2.2-verification.json) phân biệt drift V1 và regression V2.
 
 Runtime data nằm trong `state/` và bị Git ignore. Không đặt credentials, private transcripts hoặc bản sao SQLite V1 vào project. `legacy/` chỉ giữ reference/checksum và snapshot allowlist đã làm sạch.
+
+## Desktop inbox candidate — offline only
+
+`src/desktop-inbox/` implements a bounded file inbox, mock Sidecar polling, preserved worker reports and fresh parent verification. It is **OFFLINE-TESTED**, disabled, and not connected to the routing registry or live V1. The official App-owned Sidecar surface documents sending to a supplied conversation ID; identifying the focused chat, installed-version compatibility and account/terms applicability remain **NOT VERIFIED**. Real dispatch is blocked in code, including when review flags are changed.
+
+```powershell
+node --test tests/unit/desktop-inbox*.test.mjs tests/integration/desktop-inbox.test.mjs
+node scripts/desktop-inbox-smoke.mjs
+node src/desktop-inbox/cli.mjs plan
+```
+
+The smoke uses a local mock executable and retains evidence in ignored state; it is not an Antigravity Desktop pilot. See the [implementation and activation review](docs/audit/desktop-inbox-bridge.md) for contracts, limits, one-time binding and rollback gates. No registration, global config change, installation or activation is performed.
+
+## Project MCP / App receiver — staged
+
+The earlier staged MCP server (`src/desktop-inbox/mcp-server.mjs`) exposes `submit_job`, `get_job_status` and
+`get_job_result` over stdio, paired with the one-shot read-only `src/desktop-inbox/app-receiver.mjs`. See [binding, activation,
+result watcher and rollback](docs/operations/desktop-mcp-relay.md).
+
+## Live Codex Boss → Antigravity Desktop GUI Bridge
+
+`.codex/config.toml` wires `src/desktop-inbox/live-mcp-server.mjs` (`desktop_inbox`) with 7 tools (`bridge_status`, `submit_job`, `wait_job`, `get_job_status`, `get_job_result`, `verify_job`, `release_job`) so Codex acts as Boss (Orchestrator) and submits bounded read-only or write-scoped jobs directly into the open Antigravity Desktop GUI conversation:
+
+- **Hook Beacon** (`.agents/hooks.json` → `src/desktop-inbox/hook-beacon.mjs`): automatically captures the active GUI `conversationId` per workspace on `SessionStart` and `PreInvocation` without manual UUID configuration.
+- **Wave-Parallel Subagent Fan-Out & Fast Stat Cache** (`src/desktop-inbox/subtask-planner.mjs` + `src/desktop-inbox/fast-snapshot.mjs`): lets Codex Boss bundle multi-module tasks into one `submit_job` with mathematically disjoint `subtasks` waves so Antigravity GUI spawns parallel `research` / `self` subagents in one turn, backed by a stat-cached `<5ms` workspace snapshotter.
+- **Live Sidecar** (`src/desktop-inbox/live-sidecar.mjs` + `integrations/antigravity-inbox/awo-bridge.sidecar.json`): watches `state/desktop-inbox-live/` with coalesced `fs.watch` wakeup and delivers a single-line trigger via `agentapi send-message <conversation_id> <trigger>` to the open GUI session.
+- **Worker Pre-Check & Diagnostics CLI** (`src/desktop-inbox/report-cli.mjs --run-checks` + `src/desktop-inbox/bridge-cli.mjs`): runs `verification_commands` in parallel before reporting so Worker fixes issues before waking Codex Boss, plus `doctor` / `status` / `metrics` / `release-stuck` commands.
+- **Multi-Project Onboarding** (`scripts/onboard-desktop-bridge.mjs`): bootstraps `.agents/hooks.json`, `.agents/skills/`, and `.codex/config.toml` into any local repository while sharing the single `AWO Desktop Bridge` sidecar.
+
+```powershell
+node --test tests/integration/live-desktop-bridge.test.mjs
+node src/desktop-inbox/bridge-cli.mjs doctor
+node scripts/onboard-desktop-bridge.mjs <REVIEW_CHECKOUT> --dry-run
+```
