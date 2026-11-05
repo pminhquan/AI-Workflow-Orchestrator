@@ -16,7 +16,7 @@ export function scopedPath(root,p){
  safeRelative(p);root=realpathSync(root);const target=resolve(root,p);
  if(!inside(root,target))throw Error('Path outside workspace');
  let cursor=root;
- for(const part of p.split('/')){cursor=resolve(cursor,part);if(existsSync(cursor)){if(lstatSync(cursor).isSymbolicLink()||!inside(root,realpathSync(cursor)))throw Error('Links/junctions not supported in scoped paths');}}
+ for(const part of p.split('/')){cursor=resolve(cursor,part);const entry=lstatSync(cursor,{throwIfNoEntry:false});if(entry){if(entry.isSymbolicLink()||!inside(root,realpathSync(cursor)))throw Error('Links/junctions not supported in scoped paths');}}
  return target;
 }
 export function overlaps(a,b){a=a.toLowerCase().replace(/\/$/,'');b=b.toLowerCase().replace(/\/$/,'');return a===b||a.startsWith(b+'/')||b.startsWith(a+'/');}

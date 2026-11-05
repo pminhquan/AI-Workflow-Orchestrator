@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.3.0-foundation — 2026-11-05
+
+- Independently review V2.2 with one read-only native default subagent; retain separate SIMPLE/DIRECT evidence and NOT VERIFIED fresh-session/custom discovery status.
+- Fix bundle ancestor/target collisions, dangling junction detection and immutable target-root provenance; add runnable isolated onboarding/update/manual rollback validation.
+- Compare eight pinned legacy source files using ADOPT/ADAPT/REJECT and audit installed V1 source without invoking its runtime. Keep consumer Antigravity lane blocked; documented official SDK/API/CLI candidates remain design-only.
+- Preserve V1 integrity failure, baseline and live environment; prepare sanitized diff only, no publish or activation.
+
 ## 2.2.0-foundation — 2026-11-05
 
 - Audit V2.1; add native Codex instructions, pure guidance and bounded role selection while preserving offline-only scheduler execution.

@@ -1,4 +1,4 @@
-# AI Workflow Orchestrator 2.2 — Native guidance / Foundation
+# AI Workflow Orchestrator 2.3 — Practical validation / Foundation
 
 Canonical repository: `<REVIEW_CHECKOUT>`.
 
@@ -28,6 +28,7 @@ node benchmarks/run.mjs
 - **WORKING:** doctor/inventory/validate/diff-config/plan-install/test/rollback-plan; staging compiler, checksum và provenance.
 - **SESSION-VERIFIED:** native Codex delegation với hai default subagents chỉ đọc, parent đối chiếu source; xem [smoke evidence](docs/audit/v2.2-native-smoke.json). Không suy ra custom profile discovery hoặc native scheduler adapter đã working.
 - **OFFLINE-TESTED V2.2:** host-native decision guidance, hai advisory review profiles, project-local bundle preview/diff/staging; không cài lên project khác.
+- **V2.3:** target-bound staging và collision fixes; runnable isolated onboarding/update/manual rollback fixture. SIMPLE do main xử lý, MEDIUM có một native default reviewer thật. Fresh parent-session/custom discovery vẫn NOT VERIFIED; real project opt-in chưa chạy.
 - **OFFLINE-TESTED:** sáu role, ba mode, năm recipe được router sử dụng; mock/replay scheduling, idempotency, DAG, scope conflicts, host receipts, freshness, retry/rework, cancellation và durable state một process.
 - **NOT VERIFIED:** artifact native Codex/Antigravity theo tài liệu chính thức, chưa cài/chạy trong ứng dụng.
 - **UNSUPPORTED:** conversion làm mất hard constraints, consumer external dispatch, adapter không được triển khai hoặc xác minh.
@@ -48,6 +49,8 @@ node benchmarks/run.mjs
 - [Native Codex guide và capability matrix](docs/operations/native-codex.md)
 - [Onboarding project mới, dry-run và rollback](docs/operations/project-onboarding.md)
 - [V2.2 initial review](docs/audit/v2.2-initial-review.md)
+- [V2.3 review](docs/audit/v2.3-review.md), [native events index](docs/audit/v2.3-native.json), [regression evidence](docs/audit/v2.3-verification.json)
+- [Legacy ADOPT/ADAPT/REJECT](docs/research/legacy-workflow-comparison.md) và [V1 bridge compatibility](docs/audit/v2.3-bridge-compatibility.md)
 
 ## Dùng trong Codex Desktop
 

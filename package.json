@@ -1,6 +1,6 @@
 {
   "name": "ai-workflow-orchestrator",
-  "version": "2.2.0-foundation",
+  "version": "2.3.0-foundation",
   "private": true,
   "type": "module",
   "engines": {

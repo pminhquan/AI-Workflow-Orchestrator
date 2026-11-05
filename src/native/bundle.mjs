@@ -1,9 +1,18 @@
-import {existsSync,readFileSync,mkdirSync,writeFileSync,readdirSync,realpathSync} from 'node:fs';
+import {existsSync,readFileSync,mkdirSync,writeFileSync,readdirSync,realpathSync,lstatSync} from 'node:fs';
 import {resolve,dirname,isAbsolute} from 'node:path';
 import {ROOT,scopedPath,sha256} from '../core/util.mjs';
 import {requireValid} from '../core/schema.mjs';
 import {loadConfig} from '../core/config.mjs';
 import {buildArtifacts} from '../compiler/index.mjs';
+
+function fileAncestor(root,path){
+ const parts=path.split('/');
+ for(let i=1;i<parts.length;i++){
+  const prefix=parts.slice(0,i).join('/'),entry=lstatSync(scopedPath(root,prefix),{throwIfNoEntry:false});
+  if(entry&&!entry.isDirectory())return prefix;
+ }
+ return null;
+}
 
 // Prepare only. This module has no installation/global-config/reload operation.
 export function planBundle(spec,config=loadConfig()){
@@ -17,15 +26,19 @@ export function planBundle(spec,config=loadConfig()){
  for(const r of config.recipes)files['recipes/'+r.recipe_id+'.json']=artifacts['codex-guidance/recipes/'+r.recipe_id+'.json'];
  for(const p of config.native.profiles)files[p.name+'.toml']=artifacts['codex-guidance/'+p.name+'.toml'];
  const mapping={'AGENTS.snippet.md':'AGENTS.md','workflow.md':'.workflow-orchestrator/workflow.md',...Object.fromEntries(config.recipes.map(r=>['recipes/'+r.recipe_id+'.json','.workflow-orchestrator/recipes/'+r.recipe_id+'.json'])),...Object.fromEntries(config.native.profiles.map(p=>[p.name+'.toml','.codex/agents/'+p.name+'.toml']))};
- const agentsExist=existsSync(scopedPath(root,'.codex/agents'));
+ const agentsExist=!fileAncestor(root,'.codex/agents')&&existsSync(scopedPath(root,'.codex/agents'));
  const changes=Object.entries(mapping).map(([source,path])=>{
+  const blocked=fileAncestor(root,path);
+  if(blocked)return {source,path,action:'CONFLICT',reason:'Non-directory ancestor: '+blocked,before:null,after:sha256(files[source]),diff:'Existing ancestor preserved; no applicable addition.'};
   const targetPath=scopedPath(root,path),exists=existsSync(targetPath);
+  if(exists&&!lstatSync(targetPath).isFile())return {source,path,action:'CONFLICT',reason:'Target is not a regular file',before:null,after:sha256(files[source]),diff:'Existing target preserved; manual review required.'};
   const action=path==='AGENTS.md'&&exists?'MANUAL-MERGE-REQUIRED':exists||path.startsWith('.codex/agents/')&&agentsExist?'CONFLICT':'ADD';
   return {source,path,action,before:exists?sha256(readFileSync(targetPath)):null,after:sha256(files[source]),diff:action==='ADD'?files[source].split('\n').map(line=>'+'+line).join('\n'):'Existing content preserved; review staged proposal and merge separately.'};
  });
  const hashes=Object.fromEntries(Object.entries(files).map(([name,content])=>[name,sha256(content)]));
- files['bundle-manifest.json']=JSON.stringify({schema_version:'1.0',project_id:spec.project_id,version:'2.2.0-foundation',canonical_fingerprint:sha256(artifacts),files:hashes,install:false,global_config:false,custom_discovery:'NOT VERIFIED'},null,2)+'\n';
- return {dry_run:true,execution:'NOT EXECUTED',install:false,project_id:spec.project_id,status:changes.some(c=>c.action!=='ADD')?'REVIEW REQUIRED':'READY FOR REVIEW',files,changes,rollback:['Before opt-in: record exact target scope, backups/hashes, diff and fresh checks.','No target changes made by generator. After manual opt-in, remove only added files whose hashes still match the reviewed bundle.','Restore only the reviewed AGENTS section from backup; preserve concurrent edits. Never overwrite .codex/agents, global config, auth or security settings.']};
+ const scope=process.platform==='win32'?root.replaceAll('\\','/').toLowerCase():root;
+ files['bundle-manifest.json']=JSON.stringify({schema_version:'1.0',project_id:spec.project_id,version:'2.3.0-foundation',project_scope_sha256:sha256(scope),canonical_fingerprint:sha256(artifacts),files:hashes,install:false,global_config:false,custom_discovery:'NOT VERIFIED'},null,2)+'\n';
+ return {dry_run:true,execution:'NOT EXECUTED',install:false,project_id:spec.project_id,project_root:root,status:changes.some(c=>c.action!=='ADD')?'REVIEW REQUIRED':'READY FOR REVIEW',files,changes,rollback:['Before opt-in: record exact target scope, backups/hashes, diff and fresh checks.','No target changes made by generator. After manual opt-in, remove only added files whose hashes still match the reviewed bundle.','Restore only the reviewed AGENTS section from backup; preserve concurrent edits. Never overwrite .codex/agents, global config, auth or security settings.']};
 }
 
 export function stageBundle(spec,config=loadConfig()){

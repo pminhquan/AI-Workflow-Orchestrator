@@ -33,7 +33,7 @@ export function buildArtifacts(config=loadConfig()){
   results.push(entry);
  }
  const guidance=buildNativeArtifacts(config);Object.assign(files,guidance);
- files['manifest.json']=JSON.stringify({schema_version:'1.0',source_version:'2.2.0-foundation',activation:'staging-only',results,native_guidance:{status:'OFFLINE-TESTED',execution:'NOT EXECUTED',custom_discovery:'NOT VERIFIED',permission_mode:config.native.permission_mode,source:'config/integrations/codex-guidance.json',source_sha256:sha256(config.native),files:Object.keys(guidance)}},null,2)+'\n';
+ files['manifest.json']=JSON.stringify({schema_version:'1.0',source_version:'2.3.0-foundation',activation:'staging-only',results,native_guidance:{status:'OFFLINE-TESTED',execution:'NOT EXECUTED',custom_discovery:'NOT VERIFIED',permission_mode:config.native.permission_mode,source:'config/integrations/codex-guidance.json',source_sha256:sha256(config.native),files:Object.keys(guidance)}},null,2)+'\n';
  return files;
 }
 export function generatedDrift(config=loadConfig()){

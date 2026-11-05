@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0",
+  "date": "2026-11-05",
+  "baseline": "1a11685db6ade8cf2aa56d3ebac252626ac1cb20",
+  "cases": [
+    {
+      "case": "SIMPLE",
+      "status": "OBSERVED",
+      "mode": "DIRECT",
+      "actual_work": "Parent checked generated staging consistency and small-task DIRECT guidance before any V2.3 child spawn",
+      "native_subagent_calls": 0,
+      "parent_check": {
+        "mode": "DIRECT",
+        "workers": 0,
+        "generated_drift": []
+      },
+      "event_source": "functions.exec/exec_command returned actual successful assertions before the V2.3 spawn. Host fixture is synthetic guidance input, not a native execution receipt."
+    },
+    {
+      "case": "MEDIUM",
+      "status": "SESSION-VERIFIED",
+      "mode": "DELEGATED",
+      "native_subagent_calls": 1,
+      "agent": "default",
+      "task_name": "/root/v23_medium_review",
+      "fork_turns": "none",
+      "custom_profile": false,
+      "brief": "Read-only independent V2.2 review of advisory guidance, bundle collision/update/rollback coverage, canonical/generated sync and historical smoke evidence. Inspect assigned paths; cite concrete file:line repros; no edits, private sessions, outside-project reads, bridge calls or nested agents.",
+      "observed_tool_events": [
+        {
+          "tool": "collaboration.spawn_agent",
+          "returned_task_name": "/root/v23_medium_review"
+        },
+        {
+          "tool": "collaboration.list_agents",
+          "path_prefix": "/root/v23_medium_review",
+          "returned_status": "completed"
+        }
+      ],
+      "returned_result": {
+        "concrete_findings": [
+          "Regular-file ancestor is reported ADD despite impossible child destinations.",
+          "Same project_id with a different target root produces identical staged bytes."
+        ],
+        "targeted_tests_reported": "13/13 native-guidance/compiler unit tests",
+        "generated_drift_reported": [],
+        "source_hashes": {
+          "src/native/bundle.mjs": "7bc5d849f2429f636cf2c951a98be9c6883139552efc6617d99960b95188673f",
+          "src/native/guidance.mjs": "6c533eb011a15e1b78d0642eb69430bb6cf49a8d6b841a3e5c37ef848d0cfc69",
+          "src/core/util.mjs": "d8b914dfee31a939ac3837a347e0a64bc4f3c99e05672dcdea1a44f14474cd5c",
+          "tests/unit/native-guidance.test.mjs": "b96f798ef1cdc223739fe0013dd7743b0edaddfe7dc0e0e1af96cf1594215312",
+          "tests/integration/native-bundle.test.mjs": "ced3285752f88a79064bff3da1e16d461617a0dfead09251e2fa0eeda560efac",
+          "docs/audit/v2.2-native-smoke.json": "5aa5f80e124582d6a7efb3c9275787d95b718d4f9cb1ae85a2ac3d8455b75d88",
+          "agents/generated/codex-guidance/workflow.md": "598d50dbad6cd71c8fa70d6665890f56084716b050e0b0fad0eb69befdd0eccf"
+        },
+        "no_edits_reported": true
+      },
+      "parent_verification": {
+        "worker_hashes_match_historical_canonical_evidence": true,
+        "findings_reproduced_in_actual_isolated_fixtures": true,
+        "follow_up_dangling_junction_reproduced": true,
+        "regression_tests": "tests/integration/onboarding-lifecycle.test.mjs",
+        "acceptance": "Parent reproduced, fixed and independently verified; worker report is not a host receipt."
+      }
+    }
+  ],
+  "team": {
+    "status": "NOT RUN",
+    "reason": "One independent review sufficed; no additional agent calls justified"
+  },
+  "fresh_parent_session": {
+    "status": "NOT VERIFIED",
+    "blocker": "This is an existing continued chat; a fork without history creates child context, not fresh parent instruction/custom discovery."
+  },
+  "custom_discovery": {
+    "status": "NOT VERIFIED",
+    "blocker": "No live project agent install or new root session was performed; current spawn surface exposes no agent-type selector."
+  },
+  "permissions_isolation": "NOT VERIFIED; inherited parent permissions and behavioral read-only scope only",
+  "authoritative_evidence": "Actual native tool invocation, returned task name, completed list status and returned worker message in this conversation, plus parent-run assertions/test logs. This JSON is a parent-authored index, not a signed event export. The exposed tools do not export an independent raw native audit stream.",
+  "global_config_changes": false,
+  "antigravity_calls": 0,
+  "nested_agents": 0,
+  "worker_source_writes": 0,
+  "performance_claim": null,
+  "token_usage": null
+}

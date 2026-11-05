@@ -1,5 +1,7 @@
 # Native Codex V2.2
 
+V2.3 follow-up: SIMPLE was completed by the parent without a child; MEDIUM used one default native read-only reviewer and parent verification. [Current native evidence](../audit/v2.3-native.json) distinguishes observed participation from fresh parent-session/custom discovery, both NOT VERIFIED. Only isolated offline onboarding was exercised; no real project was installed. The sections below also retain the original V2.2 smoke context.
+
 Verified scope on 2026-11-05: installed Windows package `OpenAI.Codex 26.1029.7803.0`; two default native subagents completed read-heavy briefs in this session. No custom profile was selected. UI thread display was not visually inspected. Evidence: [smoke JSON](../audit/v2.2-native-smoke.json). This is a foundation release, not production readiness.
 
 ## Files Codex uses

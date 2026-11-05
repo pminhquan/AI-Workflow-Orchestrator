@@ -1,0 +1,93 @@
+{
+  "schema_version": "1.0",
+  "checked_date": "2026-11-05",
+  "legacy": {
+    "repository": "pminhquan/AI-Workflow",
+    "commit": "bcbbc864c1f64303a982f45a436f9788e0b221ff",
+    "entries": [
+      {
+        "path": "core/TASK_CLASSIFICATION.md",
+        "git_blob_sha": "0185c168a74c7d4e4101eba7460c8edcb090e387",
+        "url": "https://github.com/pminhquan/AI-Workflow/blob/bcbbc864c1f64303a982f45a436f9788e0b221ff/core/TASK_CLASSIFICATION.md",
+        "lines": 84
+      },
+      {
+        "path": "core/TASK_TEMPLATE.md",
+        "git_blob_sha": "90abb139f323debad2e57193581598d0744d44c9",
+        "url": "https://github.com/pminhquan/AI-Workflow/blob/bcbbc864c1f64303a982f45a436f9788e0b221ff/core/TASK_TEMPLATE.md",
+        "lines": 70
+      },
+      {
+        "path": "core/BRIDGE_POLICY.md",
+        "git_blob_sha": "cc5fd3105586ab8fa7a4228155577cdf1ff1f119",
+        "url": "https://github.com/pminhquan/AI-Workflow/blob/bcbbc864c1f64303a982f45a436f9788e0b221ff/core/BRIDGE_POLICY.md",
+        "lines": 104
+      },
+      {
+        "path": "core/TEST_POLICY.md",
+        "git_blob_sha": "1e512111e33286c69a4319667db7e05c0f8d6e63",
+        "url": "https://github.com/pminhquan/AI-Workflow/blob/bcbbc864c1f64303a982f45a436f9788e0b221ff/core/TEST_POLICY.md",
+        "lines": 59
+      },
+      {
+        "path": "workflows/handoff.md",
+        "git_blob_sha": "84ae5c38e6703166607b1df0155030f002036e73",
+        "url": "https://github.com/pminhquan/AI-Workflow/blob/bcbbc864c1f64303a982f45a436f9788e0b221ff/workflows/handoff.md",
+        "lines": 118
+      },
+      {
+        "path": "scripts/bridge-check.ps1",
+        "git_blob_sha": "292eb661bcd04da2a846826dfdeb3e7ba582ff32",
+        "url": "https://github.com/pminhquan/AI-Workflow/blob/bcbbc864c1f64303a982f45a436f9788e0b221ff/scripts/bridge-check.ps1",
+        "lines": 212
+      },
+      {
+        "path": "scripts/evidence-check.ps1",
+        "git_blob_sha": "fa18d4f7335ee48c2200062be2b67528eb9f2866",
+        "url": "https://github.com/pminhquan/AI-Workflow/blob/bcbbc864c1f64303a982f45a436f9788e0b221ff/scripts/evidence-check.ps1",
+        "lines": 2143
+      },
+      {
+        "path": "scripts/context-loader.ps1",
+        "git_blob_sha": "5de12c566ca55e40b181aec98af371d77d3e7522",
+        "url": "https://github.com/pminhquan/AI-Workflow/blob/bcbbc864c1f64303a982f45a436f9788e0b221ff/scripts/context-loader.ps1",
+        "lines": 259
+      }
+    ]
+  },
+  "official": [
+    {
+      "url": "https://learn.chatgpt.com/docs/agent-configuration/subagents",
+      "scope": "Native agent TOML discovery, built-ins and parent inheritance; no fresh discovery inferred"
+    },
+    {
+      "url": "https://learn.chatgpt.com/docs/agent-configuration/agents-md",
+      "scope": "Project guidance discovery"
+    },
+    {
+      "url": "https://antigravity.google/terms",
+      "scope": "Additional Terms item 6; consumer third-party access boundary"
+    },
+    {
+      "url": "https://antigravity.google/docs/subagents",
+      "scope": "App-native subagents and tool/permission inheritance"
+    },
+    {
+      "url": "https://antigravity.google/docs/cli/headless/",
+      "scope": "Documented first-party CLI surface; not invoked or treated as permission to wrap consumer OAuth"
+    },
+    {
+      "url": "https://antigravity.google/docs/sdk/overview",
+      "scope": "Separate SDK runtime; API key or cloud/enterprise route, design only"
+    },
+    {
+      "url": "https://aistudio.google.com/docs/antigravity-agent",
+      "scope": "Managed API agent, sandbox and usage/budget controls; no local account/billing verification"
+    }
+  ],
+  "limitations": [
+    "Documentation discovery is not runtime integration verification.",
+    "No Antigravity binary, internal agentapi, CDP, sidecar or ledger was invoked.",
+    "Legacy source cache is ignored; only source references/metadata are proposed for sanitized review."
+  ]
+}

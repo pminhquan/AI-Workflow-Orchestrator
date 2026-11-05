@@ -55,6 +55,8 @@ Nếu critical capability mất thì BLOCKED. DIRECT fallback chỉ được ph�
 
 `config/integrations/codex-guidance.json` map sáu logical roles sang parent, built-ins và hai advisory review profiles. Strict converter vẫn từ chối hard constraints không thể biểu diễn. Hai profile không phải conversion bảo toàn read-only/task-scoped permissions. Compiler tạo guidance/profile staging; bundle planner chỉ inspect declared project paths, báo collision/diff và stage trong ignored state. Không có installer, global config write hoặc duplicate dispatcher. Matching recipe được đọc theo nhu cầu; không load toàn bộ framework cho task nhỏ.
 
+V2.3 binds immutable project bundles to the normalized reviewed target root, reports non-directory ancestor/non-file target collisions, and rejects dangling links. A runnable isolated project validates manual opt-in/update/rollback without adding a lifecycle or installer. Bounded context and handoff provenance are guidance; [legacy compatibility audit](../audit/v2.3-bridge-compatibility.md) keeps installed V1 consumer dispatch BLOCKED and documented future SDK/API routes DESIGN-ONLY.
+
 ## State và reliability
 
 Một store mới riêng dưới project `state/`; không dùng SQLite V1. Stable idempotency key gắn hash payload, duplicate task ID/cycle/dependency không tồn tại bị từ chối atomically. Reader/writer scope conflicts giữ task queued; task review giữ ownership đến khi accept/rework. Bounded wait không tự redispatch. Failed task cần explicit retry trong budget tối đa hai rework.

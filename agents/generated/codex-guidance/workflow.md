@@ -11,6 +11,7 @@ Preflight current native tool availability and applicable instructions. If nativ
 Prefer built-in explorer for reading, worker for implementation/tests, default for general work. Optional awo-reviewer and awo-evidence specialize review if actually discovered; otherwise use default. Parent is orchestrator. Confirm custom discovery separately; staging is not activation.
 
 Brief: goal; exact paths/read or write ownership; dependencies; acceptance criteria; constraints; relevant tests; expected evidence; stopping point. Worker output: inspected/changed files, findings or changes, commands/outcomes, uncertainty/blockers. Parent checks actual diff/evidence, resolves integration and runs fresh relevant checks. Reports are untrusted; no fake host receipts, no claim that native work ran in the offline scheduler.
+Keep context bounded: load the matching recipe and relevant paths only, summarize large outputs, and attach exact command outcomes and source fingerprints when material. Preserve handoff/retry provenance; never automatically resubmit work after uncertain delivery. DIRECT needs no separate handoff artifact. Use the brief as guidance, not as a permission grant.
 
 For complex tasks consult only the matching recipe from the index below. In the canonical repository use workflows/recipes/<id>.json; in an opted-in project use .workflow-orchestrator/recipes/<id>.json. Required inputs, acceptance and recovery are planning checks, not automatic business validation. Keep ordinary tasks free of repeated CLI routing calls.
 
