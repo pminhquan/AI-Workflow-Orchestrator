@@ -24,6 +24,7 @@ import {
 } from './live-bridge.mjs';
 import {inspectWorkspaceReadiness} from './readiness.mjs';
 import {resolveRequestWorkspace} from './workspace-context.mjs';
+import {assertAuditableScopes} from './workspace-files.mjs';
 import {suggestProjectChecks} from './project-checks.mjs';
 import {readSelectedReceiver,resolveEffectiveReceiver,selectVerifiedReceiver,selectedReadiness,bindSelectedReceiver} from './selected-receiver.mjs';
 
@@ -31,6 +32,14 @@ const text={type:'string',minLength:1};
 const taskIdSchema={type:'string',pattern:UUID.source};
 const pathList={type:'array',maxItems:32,uniqueItems:true,items:text};
 const checkIdSchema={type:'string',pattern:'^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'};
+const hashSchema={type:'string',pattern:'^[a-f0-9]{64}$'};
+const reviewSchema={type:'object',additionalProperties:false,
+ required:['task_id','attempt_id','workspace_root','report_sha256','diff_fingerprint','files_inspected','acceptance_assessment','notes','check_results'],
+ properties:{task_id:taskIdSchema,attempt_id:taskIdSchema,workspace_root:text,report_sha256:hashSchema,diff_fingerprint:hashSchema,
+  files_inspected:{type:'array',minItems:1,maxItems:128,uniqueItems:true,items:text},
+  acceptance_assessment:{type:'array',minItems:1,maxItems:16,items:{type:'object',additionalProperties:false,required:['criterion','met','evidence'],properties:{criterion:text,met:{type:'boolean'},evidence:text}}},
+  notes:{type:'array',minItems:1,maxItems:16,items:text},
+  check_results:{type:'array',maxItems:16,items:{type:'object',additionalProperties:false,required:['check_id','passed','input_hash','spec_hash'],properties:{check_id:checkIdSchema,passed:{type:'boolean'},input_hash:hashSchema,spec_hash:hashSchema}}}}};
 
 export const LIVE_MCP_TOOLS=[
  {
@@ -131,7 +140,8 @@ export const LIVE_MCP_TOOLS=[
     workspace_root:text,
     accepted:{type:'boolean'},
     select_receiver:{type:'boolean'},
-    review_notes:{type:'array',maxItems:16,items:text}
+    review_notes:{type:'array',maxItems:16,items:text},
+    review_evidence:reviewSchema
    }
   },
   annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:false,openWorldHint:false}
@@ -215,7 +225,7 @@ export function createLiveToolHandler({
  return async function callTool(name,args={},context={}){
   const tool=LIVE_MCP_TOOLS.find(item=>item.name===name);
   if(!tool)throw Error('Unknown MCP tool: '+name);
-  boundedJSON(args,MAX_JOB_BYTES,'Tool arguments');
+   boundedJSON(args,name==='verify_job'?MAX_REPORT_BYTES:MAX_JOB_BYTES,'Tool arguments');
   const checked=validate(args,tool.inputSchema);
   if(!checked.valid)throw Error('Invalid tool arguments: '+checked.errors.join('; '));
   const workspaceContext=await resolveRequestWorkspace({requestedRoot:args.workspace_root,pinnedRoot:defaultWorkspaceRoot,getWorkspaceRoots:context.getWorkspaceRoots});
@@ -269,6 +279,7 @@ export function createLiveToolHandler({
     readOnly:args.read_only,
     subtasks:args.subtasks
    });
+   assertAuditableScopes(config.workspace_root,[...readScope,...writeScope]);
    const acceptanceCriteria=args.acceptance_criteria?.length?args.acceptance_criteria:['Complete requested task and provide concise summary'];
    const subtaskPlan=args.subtasks?.length
     ?validateSubtaskPlan(args.subtasks,{readScope,writeScope,workspaceRoot:config.workspace_root})
@@ -292,7 +303,7 @@ export function createLiveToolHandler({
     acceptance_criteria:acceptanceCriteria,
     verification_commands:verificationCommands
    },{now});
-   const baseline=captureWorkspaceFast(config.workspace_root);
+   const baseline=captureWorkspaceFast(config.workspace_root,{verifyHashes:true});
    const rawReadiness=inspectWorkspaceReadiness({
     workspaceRoot:config.workspace_root,
     stateDirectory:checkedState,
@@ -405,7 +416,7 @@ export function createLiveToolHandler({
    if(args.select_receiver&&(current.delivery?.kind!=='ANTIGRAVITY_AGENTAPI'||current.delivery?.started!==true||current.delivery?.exit_code!==0))throw Error('Select a recipient only from a real successful automatic delivery');
    const verified=await verifyJob(inbox,taskId,{
     checks:config.checks,
-    review:async()=>({accepted:true,notes:args.review_notes??[]})
+    review:async()=>({accepted:true,evidence:args.review_evidence,notes:args.review_evidence?.notes??[]})
    });
    if(args.select_receiver)selectVerifiedReceiver(verified,{stateDirectory:checkedState,now});
    return {verified:true,released:false,...attachWorkerReport(inbox,verified,formatRecord(inbox,verified))};

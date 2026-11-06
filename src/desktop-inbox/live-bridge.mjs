@@ -1,3 +1,4 @@
+import {normalizeCheckSpec} from '../verification/checks.mjs';
 import {randomUUID} from 'node:crypto';
 import {existsSync,mkdirSync,openSync,writeFileSync,fsyncSync,closeSync,renameSync,unlinkSync,readdirSync,lstatSync,linkSync} from 'node:fs';
 import {basename,dirname,resolve} from 'node:path';
@@ -5,6 +6,7 @@ import {ROOT,safeRelative,scopedPath,sha256} from '../core/util.mjs';
 import {Inbox} from './inbox.mjs';
 import {UUID,MAX_REPORT_BYTES,canonicalWorkspace,sameWorkspace,validateReport,isSensitivePath,validateScopePath} from './contracts.mjs';
 import {EXCLUDED_ROOTS,readBoundedBytes} from './verification.mjs';
+import {withTransactionLock} from './transaction-lock.mjs';
 import {renderSubtaskPlanMarkdown} from './subtask-planner.mjs';
 
 export const DEFAULT_LIVE_STATE='state/desktop-inbox-live';
@@ -63,9 +65,8 @@ function validateCheckSpecs(checks){
  const result={};
  for(const [id,spec] of Object.entries(checks??{})){
   if(!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/.test(id))throw Error('Invalid check ID: '+id);
-  if(!spec||!Array.isArray(spec.args)||spec.args.some(arg=>typeof arg!=='string')||!Array.isArray(spec.inputs)||!spec.inputs.length||!Number.isInteger(spec.timeout_ms)||spec.timeout_ms<1||spec.timeout_ms>5000)throw Error('Invalid check specification: '+id);
-  spec.inputs.forEach(safeRelative);
-  result[id]={args:[...spec.args],inputs:[...spec.inputs],timeout_ms:spec.timeout_ms,cacheable:false};
+  try{result[id]={...normalizeCheckSpec(spec),cacheable:false};}
+  catch(error){throw Error('Invalid check specification: '+id+': '+error.message);}
  }
  return result;
 }
@@ -132,13 +133,49 @@ export function readTargetCandidates(workspaceRoot,{stateDirectory=DEFAULT_LIVE_
  const directory=scopedPath(ROOT,`${workspaceStateRelative(workspaceRoot,stateDirectory)}/targets`);
  if(!existsSync(directory))return [];
  const names=readdirSync(directory).filter(name=>/^[a-f0-9]{64}\.json$/.test(name));
- if(names.length>128)throw Error('Too many target observations; explicit review required');
+ if(names.length>4096)throw Error('Too many target observations; explicit review required');
  return names.map(name=>readBoundedJSON(scopedPath(directory,name),8192));
+}
+
+const TARGET_TTL_MS=2*60*60*1000;
+function pruneExpiredTargets(workspaceRoot,{stateDirectory,now}){
+ const directory=scopedPath(ROOT,workspaceStateRelative(workspaceRoot,stateDirectory)+'/targets');
+ if(!existsSync(directory))return {removed:0};
+ const protect=new Set();
+ try{
+  const current=readActiveTarget(workspaceRoot,{stateDirectory});if(current?.conversation_id)protect.add(current.conversation_id);
+  const selectedPath=scopedPath(ROOT,checkedStateDirectory(stateDirectory)+'/selected-receiver.json');
+  if(existsSync(selectedPath)){const selected=readBoundedJSON(selectedPath,4096);if(selected.conversation_id)protect.add(selected.conversation_id);}
+  const {inbox}=existingLiveInbox(workspaceRoot,{stateDirectory});
+  if(inbox)for(const record of inbox.list()){
+   if(record.state==='VERIFIED'||['FAILED','RELEASED'].includes(record.outcome))continue;
+   if(record.state==='CLAIMED')return {removed:0,skipped:'CLAIMED_RECEIVER_UNKNOWN'};
+   if(record.delivery?.target_conversation_id)protect.add(record.delivery.target_conversation_id);
+   const route=scopedPath(inbox.root,'delivery-targets/'+record.job.task_id+'-'+record.job.attempt_id+'.json');
+   if(existsSync(route)){const target=readBoundedJSON(route,8192);if(target.selection?.conversation_id)protect.add(target.selection.conversation_id);}
+  }
+ }catch{return {removed:0,skipped:'ACTIVE_RECEIVER_UNKNOWN'};}
+ let removed=0;
+ const names=readdirSync(directory).filter(n=>/^[a-f0-9]{64}\.json$/.test(n));
+ if(names.length>4096)throw Error('Too many target observations; explicit review required');
+ for(const name of names){const file=scopedPath(directory,name);let observation;try{observation=readBoundedJSON(file,8192);if(!sameWorkspace(observation?.workspace_root,workspaceRoot))continue;}catch{continue;}
+  const stamp=Date.parse(observation.updated_at);
+  if(observation.format==='desktop-inbox.active-target@1'&&Number.isFinite(stamp)&&now()-stamp>TARGET_TTL_MS&&!protect.has(observation.conversation_id)){unlinkSync(file);removed++;}
+ }
+ return {removed};
+}
+export function pruneTargetObservations(workspaceRoot,{stateDirectory=DEFAULT_LIVE_STATE,now=Date.now}={}){
+ ensureWorkspaceRegistration(workspaceRoot,{stateDirectory});
+ const lock=scopedPath(ROOT,workspaceStateRelative(workspaceRoot,stateDirectory)+'/target-observations.lock');
+ return withTransactionLock(lock,()=>pruneExpiredTargets(workspaceRoot,{stateDirectory,now}));
 }
 
 export function writeActiveTarget(workspaceRoot,{conversationId,eventName='SessionStart',modelName=null,workspacePaths=null,eventTimestamp=null,stateDirectory=DEFAULT_LIVE_STATE,now=Date.now}={}){
  const config=resolveWorkspaceConfig(workspaceRoot,{stateDirectory});
  if(typeof conversationId!=='string'||!TARGET_ID.test(conversationId.trim()))throw Error('Invalid conversationId for active target');
+ ensureWorkspaceRegistration(config.workspace_root,{stateDirectory});
+ const lock=scopedPath(ROOT,workspaceStateRelative(config.workspace_root,stateDirectory)+'/target-observations.lock');
+ return withTransactionLock(lock,()=>{
  const payload={
   format:'desktop-inbox.active-target@1',
   workspace_root:config.workspace_root,
@@ -154,7 +191,9 @@ export function writeActiveTarget(workspaceRoot,{conversationId,eventName='Sessi
  atomicWriteJSON(candidatePath,observation);
  const path=activeTargetPath(config.workspace_root,stateDirectory);
  atomicWriteJSON(path,payload);
+ pruneExpiredTargets(config.workspace_root,{stateDirectory,now});
  return {path,target:payload};
+ });
 }
 
 export function readActiveTarget(workspaceRoot,{stateDirectory=DEFAULT_LIVE_STATE}={}){
@@ -241,103 +280,16 @@ export function defaultWorkspaceScopes(workspaceRoot){
 }
 
 const WRITE_INTENT_RE=/\b(update|edit|modify|write|fix|add|create|implement|refactor|change|patch|remove|delete|rename|optimize|sửa|thêm|tạo|viết|cập nhật|xóa|tối ưu)\b/i;
-const STOP_WORDS=new Set(['update','edit','modify','write','fix','add','create','implement','refactor','change','patch','remove','delete','rename','optimize','with','fast','summary','the','and','for','from','into','that','this','have','has','not','are','was','were','will','can','should','would','could','please','file','files','code','test','tests','job','task','function','class','method','module','return','returns','value','input','output','sua','them','tao','viet','cap','nhat','xoa','toi']);
 
-function escapeRegExp(s){
- return String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-}
-
+// Parent selects write ownership from inspected code. Text matching grants no writes.
 export function inferJobScopes(workspaceRoot,request,{readScope=null,writeScope=undefined,readOnly=false,subtasks=null}={}){
  const ws=canonicalWorkspace(workspaceRoot);
- const files=[];
- function walk(relDir=''){
-  if(files.length>=400)return;
-  const absDir=relDir?scopedPath(ws,relDir):ws;
-  let entries=[];
-  try{entries=readdirSync(absDir).sort();}catch{return;}
-  for(const name of entries){
-   if(files.length>=400)break;
-   const lower=name.toLowerCase();
-   if(EXCLUDED_ROOTS.includes(lower)||name==='.codex'||name==='.gemini')continue;
-   const rel=relDir?`${relDir}/${name}`:name;
-   if(isSensitivePath(rel))continue;
-   let stat;
-   try{
-    validateScopePath(ws,rel);
-    stat=lstatSync(scopedPath(ws,rel));
-   }catch{continue;}
-   if(stat.isSymbolicLink())continue;
-   if(stat.isDirectory())walk(rel);
-   else if(stat.isFile())files.push(rel);
-  }
- }
- walk();
-
- const hasSubtaskWrites=Array.isArray(subtasks)&&subtasks.some(s=>Array.isArray(s?.write_scope)&&s.write_scope.length>0);
- let resolvedWrite;
- if(writeScope!==undefined){
-  resolvedWrite=Array.isArray(writeScope)?[...writeScope]:writeScope;
- }else if(readOnly===true){
-  resolvedWrite=[];
- }else if(Array.isArray(readScope)&&readScope.length>0&&!hasSubtaskWrites){
-  resolvedWrite=[];
- }else if(hasSubtaskWrites){
-  resolvedWrite=[...new Set(subtasks.flatMap(s=>s.write_scope??[]))];
- }else{
-  const reqText=String(request??'');
-  if(!WRITE_INTENT_RE.test(reqText)){
-   resolvedWrite=[];
-  }else{
-   const matched=[];
-   for(const rel of files){
-    const base=basename(rel);
-    const stem=base.replace(/\.[^.]+$/,'');
-    const relRe=new RegExp(`(^|[^A-Za-z0-9_./\\\\-])${escapeRegExp(rel)}($|[^A-Za-z0-9_./\\\\-])`,'i');
-    const baseRe=new RegExp(`(^|[^A-Za-z0-9_./\\\\-])${escapeRegExp(base)}($|[^A-Za-z0-9_./\\\\-])`,'i');
-    const stemRe=stem.length>=2&&!STOP_WORDS.has(stem.toLowerCase())?new RegExp(`\\b${escapeRegExp(stem)}\\b`,'i'):null;
-    if(relRe.test(reqText)||baseRe.test(reqText)||(stemRe&&stemRe.test(reqText))){
-     matched.push(rel);
-    }
-   }
-   if(matched.length>0){
-    resolvedWrite=[...new Set(matched)].slice(0,32);
-   }else{
-    const rawTokens=reqText.match(/[A-Za-z_][A-Za-z0-9_]{2,}/g)??[];
-    const tokens=[...new Set(rawTokens.filter(t=>!STOP_WORDS.has(t.toLowerCase())))];
-    const scored=[];
-    if(tokens.length>0){
-     const tokenRegexes=tokens.map(t=>new RegExp(`\\b${escapeRegExp(t)}\\b`));
-     for(const rel of files){
-      try{
-       const full=scopedPath(ws,rel);
-       const stat=lstatSync(full);
-       if(!stat.isFile()||stat.size>131072)continue;
-       const text=readBoundedBytes(full,131072).toString('utf8');
-       let hits=0;
-       for(const rx of tokenRegexes){if(rx.test(text))hits++;}
-       if(hits>0)scored.push({rel,hits});
-      }catch{}
-     }
-     scored.sort((a,b)=>b.hits-a.hits||a.rel.localeCompare(b.rel));
-    }
-    if(scored.length>0){
-     resolvedWrite=scored.slice(0,4).map(x=>x.rel);
-    }else if(files.length===1){
-     resolvedWrite=[files[0]];
-    }else{
-     resolvedWrite=[];
-    }
-   }
-  }
- }
-
- const resolvedRead=Array.isArray(readScope)&&readScope.length>0
-  ?[...new Set([...resolvedWrite,...readScope])]
-  :[...new Set([...resolvedWrite,...defaultWorkspaceScopes(ws)])].slice(0,32);
- return {
-  readScope:resolvedRead.length?resolvedRead:['README.md'],
-  writeScope:resolvedWrite
- };
+ const hasSubtaskWrites=Array.isArray(subtasks)&&subtasks.some(s=>s?.write_scope?.length);
+ if(readOnly===true&&((Array.isArray(writeScope)&&writeScope.length)||hasSubtaskWrites))throw Error('read_only conflicts with write_scope');
+ if(writeScope===undefined&&!readOnly&&(hasSubtaskWrites||WRITE_INTENT_RE.test(String(request??''))))throw Error('WRITE_SCOPE_REQUIRED: Codex must inspect relevant code and pass explicit write_scope before submitting a write job');
+ const resolvedWrite=writeScope===undefined?[]:writeScope;
+ const resolvedRead=Array.isArray(readScope)&&readScope.length?readScope:resolvedWrite.length?resolvedWrite:defaultWorkspaceScopes(ws);
+ return {readScope:[...new Set([...resolvedRead,...resolvedWrite])].slice(0,32),writeScope:resolvedWrite};
 }
 
 export function resolveLatestWorkspaceTask(workspaceRoot,{stateDirectory=DEFAULT_LIVE_STATE,now=Date.now}={}){

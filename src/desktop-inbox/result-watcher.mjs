@@ -31,14 +31,17 @@ export function readmeSmokeVerification(record) {
  const expected=record.baseline.entries['README.md'];
  if(!/^[a-f0-9]{64}$/.test(expected??''))throw Error('README baseline hash missing');
  const checks={'readme-smoke':{args:['-e',`const fs=require('node:fs'),crypto=require('node:crypto'),assert=require('node:assert/strict');assert.equal(crypto.createHash('sha256').update(fs.readFileSync('README.md')).digest('hex'),${JSON.stringify(expected)});console.log('README baseline SHA-256 matches')`],inputs:['README.md'],timeout_ms:2000}};
- const review=({report,artifacts})=>{
+ const review=({report,artifacts,review_context,checks=[]})=>{
   const bytes=readBoundedBytes(scopedPath(job.workspace_root,'README.md'),1024*1024),text=bytes.toString('utf8');
   const title=text.match(/^#\s+(.+)$/m)?.[1]?.trim(),purpose=text.match(/Đây là [^\r\n]+?\./u)?.[0];
   if(!title||!purpose)throw Error('Canonical README title/purpose sentence unavailable');
   if(sha256(bytes)!==expected||!artifacts.result.includes(title)||!artifacts.result.includes(purpose)||
     !artifacts.result.includes(expected)||!report.evidence.some(value=>value.includes(expected))||
     !/\bNOT RUN\b/i.test(artifacts.result)||report.tests.length||JSON.stringify(report.inspected_files)!=='["README.md"]')throw Error('README smoke content/hash/tests declaration mismatch');
-  return {accepted:true};
+  return {accepted:true,evidence:{...review_context,files_inspected:['README.md'],
+   acceptance_assessment:job.acceptance_criteria.map(criterion=>({criterion,met:true,evidence:'Restricted README smoke checked exact heading, purpose, raw hash and NOT RUN declaration'})),
+   notes:['Deterministic restricted README smoke assertions; this metadata does not prove AI reading'],
+   check_results:checks.map(check=>({check_id:check.check_id,passed:check.passed,input_hash:check.input_hash,spec_hash:check.spec_hash}))}};
  };
  return {checks,review};
 }

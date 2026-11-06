@@ -164,7 +164,8 @@ export function evaluateBridgeReadiness({
    if(heartbeat.agentapi_available!==true){
     reasonCodes.push(READINESS_REASONS.AGENTAPI_UNAVAILABLE);
    }
-   if(heartbeat.ls_address_present!==true){
+   const documentedPath=heartbeat.agentapi_source==='PATH'&&heartbeat.agentapi_support==='DOCUMENTED';
+   if(!documentedPath&&heartbeat.ls_address_present!==true){
     reasonCodes.push(READINESS_REASONS.LS_ADDRESS_MISSING);
    }
   }

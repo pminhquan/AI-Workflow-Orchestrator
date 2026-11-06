@@ -20,7 +20,7 @@ import {
   CODEX_MCP_END_MARKER,
   HOOK_KEY
 } from '../../src/desktop-inbox/global-install.mjs';
-import {createLiveToolHandler} from '../../src/desktop-inbox/live-mcp-server.mjs';
+import {createReviewedToolHandler as createLiveToolHandler} from '../desktop-review-fixtures.mjs';
 import {runLiveSidecarTick} from '../../src/desktop-inbox/live-sidecar.mjs';
 import {submitWorkerReport} from '../../src/desktop-inbox/report-cli.mjs';
 import {

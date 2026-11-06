@@ -9,7 +9,8 @@ import {captureWorkspace} from '../../src/desktop-inbox/verification.mjs';
 import {captureWorkspaceFast,getSnapshotCacheStats,invalidateWorkspaceCache} from '../../src/desktop-inbox/fast-snapshot.mjs';
 import {openLiveInbox,registerLocalWorkspace,writeActiveTarget} from '../../src/desktop-inbox/live-bridge.mjs';
 import {bridgeDoctor,bridgeMetrics,releaseStuckJobs} from '../../src/desktop-inbox/bridge-cli.mjs';
-import {createLiveToolHandler,LIVE_MCP_TOOLS} from '../../src/desktop-inbox/live-mcp-server.mjs';
+import {LIVE_MCP_TOOLS} from '../../src/desktop-inbox/live-mcp-server.mjs';
+import {createReviewedToolHandler as createLiveToolHandler} from '../desktop-review-fixtures.mjs';
 import {TARGET_OBSERVATION_TTL_MS} from '../../src/desktop-inbox/readiness.mjs';
 import {defaultInvokeAgentapi,inspectAgentapiEnv,resolveAgentapiCommand,runLiveSidecarTick} from '../../src/desktop-inbox/live-sidecar.mjs';
 import {submitWorkerReport} from '../../src/desktop-inbox/report-cli.mjs';
@@ -405,16 +406,19 @@ test('wave-parallel subtasks enforce disjoint write scopes, survive sidecar disp
  }
 });
 
-test('ANTIGRAVITY_AGENTAPI_EXE sidecar transport resolves agentapi subcommand and cross-project projectId',async()=>{
+test('legacy App CLI sends once without undocumented metadata or project environment rewrite',async()=>{
  const h=createFixture();
  try{
   // 1. Unit-check resolveAgentapiCommand & inspectAgentapiEnv
   const fallbackCmd=resolveAgentapiCommand(['send-message','conv-1','hi'],{});
-  assert.deepEqual(fallbackCmd,{executable:'agentapi',args:['send-message','conv-1','hi'],source:'PATH'});
+  assert.equal(fallbackCmd.executable,null);
+  assert.equal(fallbackCmd.source,'UNAVAILABLE');
   assert.equal(inspectAgentapiEnv({}).agentapi_available,false);
 
   const customCmd=resolveAgentapiCommand(['send-message','conv-1','hi'],{ANTIGRAVITY_AGENTAPI_EXE:process.execPath,ANTIGRAVITY_LS_ADDRESS:'127.0.0.1:55555'});
-  assert.deepEqual(customCmd,{executable:process.execPath,args:['agentapi','send-message','conv-1','hi'],source:'ANTIGRAVITY_AGENTAPI_EXE'});
+  assert.equal(customCmd.source,'ANTIGRAVITY_AGENTAPI_EXE');
+  assert.deepEqual(customCmd.args,['agentapi','send-message','conv-1','hi']);
+  assert.equal(customCmd.support,'LEGACY_COMPAT_NOT_VERIFIED');
   const envInfo=inspectAgentapiEnv({ANTIGRAVITY_AGENTAPI_EXE:process.execPath,ANTIGRAVITY_LS_ADDRESS:'127.0.0.1:55555'});
   assert.equal(envInfo.agentapi_available,true);
   assert.equal(envInfo.ls_address_present,true);
@@ -430,13 +434,11 @@ test('ANTIGRAVITY_AGENTAPI_EXE sidecar transport resolves agentapi subcommand an
   // Place extensionless JS script named `agentapi` inside inbox.root so `node.exe agentapi <subcmd>` runs with shell:false
   const {inbox}=openLiveInbox(h.workspace,{stateDirectory:h.stateDirectory});
   const fakeAgentapiScript=[
+   'import {appendFileSync} from "node:fs";',
    'const sub=process.argv[2];',
-   'if(sub==="get-conversation-metadata"){',
-   ' process.stdout.write(JSON.stringify({response:{conversationMetadata:{metadata:{projectId:"app-proj-resolved-77"}}}}));',
-   ' process.exit(0);',
-   '}',
+   'appendFileSync("transport-calls.log", sub+"\\n");',
    'if(sub==="send-message"){',
-   ' if(process.argv[3]!=="conv-exe-live"||process.env.ANTIGRAVITY_PROJECT_ID!=="app-proj-resolved-77")process.exit(42);',
+   ' if(process.argv[3]!=="conv-exe-live"||process.env.ANTIGRAVITY_PROJECT_ID!=="initial-other-proj")process.exit(42);',
    ' process.stdout.write("delivered-ok");',
    ' process.exit(0);',
    '}',
@@ -446,6 +448,7 @@ test('ANTIGRAVITY_AGENTAPI_EXE sidecar transport resolves agentapi subcommand an
 
   const sidecarEnv={
    ...process.env,
+   PATH:'',Path:'',
    ANTIGRAVITY_AGENTAPI_EXE:process.execPath,
    ANTIGRAVITY_LS_ADDRESS:'127.0.0.1:55555',
    ANTIGRAVITY_PROJECT_ID:'initial-other-proj'
@@ -465,6 +468,7 @@ test('ANTIGRAVITY_AGENTAPI_EXE sidecar transport resolves agentapi subcommand an
   assert.equal(jobStatus.outcome,null);
   assert.equal(jobStatus.delivery.executable_source,'ANTIGRAVITY_AGENTAPI_EXE');
   assert.equal(jobStatus.delivery.exit_code,0);
+  assert.deepEqual(readFileSync(resolve(inbox.root,'transport-calls.log'),'utf8').trim().split('\n'),['send-message']);
 
   const bridgeStatus=await h.callTool('bridge_status',{});
   assert.equal(bridgeStatus.sidecar_running,true);

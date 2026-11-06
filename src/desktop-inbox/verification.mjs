@@ -1,65 +1,48 @@
-import {existsSync,lstatSync,readdirSync,realpathSync,openSync,fstatSync,readSync,closeSync} from 'node:fs';
+import {existsSync,lstatSync,openSync,fstatSync,readSync,closeSync,constants} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {isAbsolute,relative} from 'node:path';
 import {sha256,scopedPath} from '../core/util.mjs';
 import {changedFiles,verifyScope,CheckRunner} from '../verification/checks.mjs';
-import {validateReport,isSensitivePath,canonicalWorkspace,MAX_REPORT_BYTES,noKnownSecrets} from './contracts.mjs';
+import {validateReport,canonicalWorkspace,MAX_REPORT_BYTES,noKnownSecrets} from './contracts.mjs';
+import {workspaceFiles,assertAuditableScopes,EXCLUDED_ROOTS as SOURCE_EXCLUSIONS} from './workspace-files.mjs';
+
+import {reviewBinding,validateParentReview} from './review-evidence.mjs';
 
 export const MAX_WORKSPACE_BYTES=64*1024*1024;
 export const MAX_WORKSPACE_FILE_BYTES=16*1024*1024;
 
-export const EXCLUDED_ROOTS = ['.git','.venv','node_modules','state','__pycache__','.pytest_cache','dist','build','.next','.turbo','coverage','target','.idea','.vscode'];
+export const EXCLUDED_ROOTS = SOURCE_EXCLUSIONS;
 
 export function readBoundedBytes(path,limit) {
-  const fd = openSync(path,'r');
+  const prior=lstatSync(path);
+  if(prior.isSymbolicLink()||!prior.isFile())throw Error('Nonregular local file');
+  const same=(a,b)=>a.dev===b.dev&&a.ino===b.ino&&a.size===b.size&&a.mtimeMs===b.mtimeMs&&a.ctimeMs===b.ctimeMs;
+  const fd = openSync(path,constants.O_RDONLY|(constants.O_NOFOLLOW??0));
   try {
     const stat = fstatSync(fd);
     if (!stat.isFile() || stat.size > limit) throw Error('Nonregular/oversize local file');
+    if(!same(prior,stat))throw Error('Local file changed before reading');
     const buffer = Buffer.alloc(stat.size+1);
     let count = 0, size;
     while (count < buffer.length && (size = readSync(fd,buffer,count,buffer.length-count,null)) > 0) count += size;
-    if (count !== stat.size) throw Error('Local file changed while reading');
+    if (count !== stat.size||!same(stat,fstatSync(fd))||!same(stat,lstatSync(path))) throw Error('Local file changed while reading');
     return buffer.subarray(0,count);
   } finally { closeSync(fd); }
 }
 
-// Audit of ordinary project files, not a filesystem sandbox. Never traverse the
-// dependency/runtime roots listed above, symlinks, or recognizable private files.
+// Ordinary source audit, not OS isolation. Enumeration is shared with the
+// advisory cache; final verification always reads fresh file bytes.
 export function captureWorkspace(workspace) {
-  workspace = realpathSync(workspace);
-  const entries = Object.create(null);
-  let count = 0, bytes = 0;
-  function visit(relativePath) {
-    if (isSensitivePath(relativePath)) return;
-    const path = scopedPath(workspace,relativePath);
-    const stat = lstatSync(path);
-    if (stat.isDirectory()) {
-      for (const child of readdirSync(path).sort()) visit(relativePath+'/'+child);
-    } else {
-      if (!stat.isFile() || ++count > 2000 || (bytes += stat.size) > MAX_WORKSPACE_BYTES) throw Error('Workspace snapshot limit/nonregular file');
-      const data = readBoundedBytes(path,Math.min(MAX_WORKSPACE_FILE_BYTES,MAX_WORKSPACE_BYTES-(bytes-stat.size)));
-      bytes += data.length-stat.size;
-      entries[relativePath] = sha256(data);
-    }
-  }
-  for (const name of readdirSync(workspace).sort()) {
-    if (EXCLUDED_ROOTS.includes(name.toLowerCase())) continue;
-    if (name === '.codex') {
-      const configRoot = scopedPath(workspace,name);
-      if (!lstatSync(configRoot).isDirectory()) throw Error('Project .codex must be a regular directory');
-      // Do not traverse private configuration. Only the project-local MCP file
-      // explicitly requested for this bridge is eligible for a parent hash.
-      const children = readdirSync(configRoot);
-      // Other private Codex entries are outside this ordinary source audit.
-      // Do not traverse them or expose their contents to workers.
-      if (children.includes('config.toml')) {
-        const config = readBoundedBytes(scopedPath(workspace,'.codex/config.toml'),32768);
-        noKnownSecrets(config.toString('utf8'));
-        entries['.codex/config.toml'] = sha256(config);
-      }
-      continue;
-    }
-    visit(name);
+  workspace=canonicalWorkspace(workspace);
+  const entries=Object.create(null);let bytes=0;
+  for(const rel of workspaceFiles(workspace)){
+    const path=scopedPath(workspace,rel),stat=lstatSync(path);
+    if((bytes+=stat.size)>MAX_WORKSPACE_BYTES)throw Error('Workspace snapshot limit exceeded');
+    const limit=rel==='.codex/config.toml'?32768:MAX_WORKSPACE_FILE_BYTES;
+    const data=readBoundedBytes(path,Math.min(limit,MAX_WORKSPACE_BYTES-(bytes-stat.size)));
+    bytes+=data.length-stat.size;
+    if(rel==='.codex/config.toml')noKnownSecrets(data.toString('utf8'));
+    entries[rel]=sha256(data);
   }
   return {entries,hash:sha256(entries)};
 }
@@ -120,6 +103,7 @@ export async function runMechanicalVerification(inbox,taskId,{checks = {},snapsh
     if (record.outcome === 'FAILED') throw Error('Failed task cannot be verified');
     const report = readReport(inbox,record);
     if (report.status !== 'reported' || report.blockers.length || report.errors.length) throw Error('Worker blocked/failed or reported errors; parent acceptance unavailable');
+    assertAuditableScopes(job.workspace_root,[...job.read_scope,...job.write_scope]);
     const before = snapshot(job.workspace_root);
     const actual = changedFiles(record.baseline,before);
     verifyScope(actual,report.changed_files,job.write_scope);
@@ -155,6 +139,8 @@ export async function runMechanicalVerification(inbox,taskId,{checks = {},snapsh
       scope_valid:true,
       checks:receipts,
       acceptance_criteria:structuredClone(job.acceptance_criteria),
+      review_context:reviewBinding(job,{report_sha256:record.report_sha256,baseline_sha256:record.baseline.hash,after_sha256:before.hash,actual_changed_files:actual}),
+      review_assurance:'PARENT_ASSERTION_REQUIRED_NOT_PROOF_OF_READING',
       error:null
     };
   } catch (err) {
@@ -187,7 +173,8 @@ export async function verifyJob(inbox,taskId,{checks = {},review,snapshot = capt
   const report = readReport(inbox,record);
   if (report.status !== 'reported' || report.blockers.length || report.errors.length) throw Error('Worker blocked/failed or reported errors; parent acceptance unavailable');
   if (typeof review !== 'function') throw Error('Independent parent source/findings review is required');
-  const before = snapshot(job.workspace_root);
+  assertAuditableScopes(job.workspace_root,[...job.read_scope,...job.write_scope]);
+    const before = snapshot(job.workspace_root);
   const actual = changedFiles(record.baseline,before);
   verifyScope(actual,report.changed_files,job.write_scope);
   validateChangedSourceSyntax(job.workspace_root,actual);
@@ -205,16 +192,18 @@ export async function verifyJob(inbox,taskId,{checks = {},review,snapshot = capt
       executed_at:receipt.executed_at,reused:receipt.reused});
     if (!receipt.passed || receipt.reused) throw Error('Fresh host check failed: '+id);
   }
-  const decision = await review({job:structuredClone(job),report:structuredClone(report),
+  const binding=reviewBinding(job,{report_sha256:record.report_sha256,baseline_sha256:record.baseline.hash,after_sha256:before.hash,actual_changed_files:actual});
+  const decision = await review({job:structuredClone(job),report:structuredClone(report),review_context:binding,
     actual_changed_files:actual,checks:structuredClone(receipts)});
   if (!decision || decision.accepted !== true) throw Error('Parent review did not accept findings');
+  const evidence=validateParentReview(decision.evidence,{job,report_sha256:record.report_sha256,baseline_sha256:record.baseline.hash,after_sha256:before.hash,actual_changed_files:actual,checks:receipts});
   const after = snapshot(job.workspace_root);
   if (before.hash !== after.hash) throw Error('Workspace changed during parent verification');
   readReport(inbox,record);
   const hostReceipt = {kind:'desktop-inbox.host-receipt@1',task_id:job.task_id,
     attempt_id:job.attempt_id,workspace_root:job.workspace_root,report_sha256:record.report_sha256,
     job_sha256:sha256(job),baseline_sha256:record.baseline.hash,after_sha256:after.hash,
-    checks:receipts,actual_changed_files:actual,accepted:true,
+    checks:receipts,actual_changed_files:actual,accepted:true,review_evidence:evidence,
     ...(Array.isArray(decision.notes) && decision.notes.length ? {review_notes:decision.notes.map(String)} : {}),
     verified_at:new Date().toISOString()};
   return inbox.verify(taskId,hostReceipt);

@@ -1,11 +1,11 @@
-import {lstatSync,readdirSync,realpathSync} from 'node:fs';
+import {lstatSync,realpathSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {sha256,scopedPath} from '../core/util.mjs';
-import {isSensitivePath,noKnownSecrets} from './contracts.mjs';
-import {EXCLUDED_ROOTS,readBoundedBytes,MAX_WORKSPACE_BYTES,MAX_WORKSPACE_FILE_BYTES} from './verification.mjs';
+import {canonicalWorkspace,noKnownSecrets} from './contracts.mjs';
+import {workspaceFiles} from './workspace-files.mjs';
+import {readBoundedBytes,MAX_WORKSPACE_BYTES,MAX_WORKSPACE_FILE_BYTES} from './verification.mjs';
 
 const RACY_WRITE_WINDOW_MS = 50;
-const MAX_SNAPSHOT_FILES = 2000;
 const MAX_SNAPSHOT_BYTES = MAX_WORKSPACE_BYTES;
 
 const workspaceCaches = new Map();
@@ -40,76 +40,27 @@ export function getSnapshotCacheStats() {
 }
 
 export function captureWorkspaceFast(workspace, { verifyHashes = false } = {}) {
-  workspace = realpathSync(workspace);
+  workspace = canonicalWorkspace(workspace);
   const cacheKey = normalizeWorkspaceKey(workspace);
   let fileCache = workspaceCaches.get(cacheKey);
-  if (!fileCache) {
-    fileCache = new Map();
-    workspaceCaches.set(cacheKey, fileCache);
-  }
-
-  const entries = Object.create(null);
-  const seen = new Set();
-  let count = 0, bytes = 0;
-
-  function visit(relativePath) {
-    if (isSensitivePath(relativePath)) return;
-    const path = scopedPath(workspace, relativePath);
-    const stat = lstatSync(path);
-    if (stat.isDirectory()) {
-      for (const child of readdirSync(path).sort()) visit(relativePath + '/' + child);
-    } else {
-      if (!stat.isFile() || ++count > MAX_SNAPSHOT_FILES || (bytes += stat.size) > MAX_SNAPSHOT_BYTES) {
-        throw Error('Workspace snapshot limit/nonregular file');
-      }
-      seen.add(relativePath);
-      const cached = fileCache.get(relativePath);
-      if (
-        !verifyHashes &&
-        cached &&
-        stat.size === cached.size &&
-        stat.mtimeMs === cached.mtimeMs &&
-        stat.ino === cached.ino &&
-        stat.mtimeMs < Date.now() - RACY_WRITE_WINDOW_MS
-      ) {
-        hits++;
-        entries[relativePath] = cached.hash;
-      } else {
-        misses++;
-        const data = readBoundedBytes(path, Math.min(MAX_WORKSPACE_FILE_BYTES,MAX_SNAPSHOT_BYTES - (bytes - stat.size)));
-        bytes += data.length - stat.size;
-        const hash = sha256(data);
-        fileCache.set(relativePath, {
-          size: data.length,
-          mtimeMs: stat.mtimeMs,
-          ino: stat.ino,
-          hash
-        });
-        entries[relativePath] = hash;
-      }
+  if (!fileCache) {fileCache = new Map();workspaceCaches.set(cacheKey, fileCache);}
+  const entries=Object.create(null),seen=new Set();let bytes=0;
+  for(const rel of workspaceFiles(workspace)){
+    const path=scopedPath(workspace,rel),stat=lstatSync(path);
+    if((bytes+=stat.size)>MAX_SNAPSHOT_BYTES)throw Error('Workspace snapshot limit exceeded');
+    seen.add(rel);const cached=fileCache.get(rel);
+    if(rel!=='.codex/config.toml'&&!verifyHashes&&cached&&stat.size===cached.size&&stat.mtimeMs===cached.mtimeMs&&stat.ctimeMs===cached.ctimeMs&&stat.ino===cached.ino&&stat.dev===cached.dev&&stat.mtimeMs<Date.now()-RACY_WRITE_WINDOW_MS){
+      hits++;entries[rel]=cached.hash;
+    }else{
+      misses++;
+      const limit=rel==='.codex/config.toml'?32768:MAX_WORKSPACE_FILE_BYTES;
+      const data=readBoundedBytes(path,Math.min(limit,MAX_SNAPSHOT_BYTES-(bytes-stat.size)));
+      bytes+=data.length-stat.size;
+      if(rel==='.codex/config.toml')noKnownSecrets(data.toString('utf8'));
+      const hash=sha256(data);
+      fileCache.set(rel,{size:data.length,mtimeMs:stat.mtimeMs,ctimeMs:stat.ctimeMs,ino:stat.ino,dev:stat.dev,hash});entries[rel]=hash;
     }
   }
-
-  for (const name of readdirSync(workspace).sort()) {
-    if (EXCLUDED_ROOTS.includes(name.toLowerCase())) continue;
-    if (name === '.codex') {
-      const configRoot = scopedPath(workspace, name);
-      if (!lstatSync(configRoot).isDirectory()) throw Error('Project .codex must be a regular directory');
-      const children = readdirSync(configRoot);
-      // Ignore private Codex entries; only the already managed MCP config is hashed.
-      if (children.includes('config.toml')) {
-        const config = readBoundedBytes(scopedPath(workspace, '.codex/config.toml'), 32768);
-        noKnownSecrets(config.toString('utf8'));
-        entries['.codex/config.toml'] = sha256(config);
-      }
-      continue;
-    }
-    visit(name);
-  }
-
-  for (const cachedPath of fileCache.keys()) {
-    if (!seen.has(cachedPath)) fileCache.delete(cachedPath);
-  }
-
-  return { entries, hash: sha256(entries) };
+  for(const cachedPath of fileCache.keys())if(!seen.has(cachedPath))fileCache.delete(cachedPath);
+  return {entries,hash:sha256(entries)};
 }

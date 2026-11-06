@@ -1,3 +1,4 @@
+import {parentReview} from '../desktop-review-fixtures.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -81,7 +82,7 @@ test('verification needs fresh registered check and independent review; config w
  const h=setup();try{
   h.dispatch();h.pair();let reviews=0;
   const checks={readme:{args:['-e','require("node:assert/strict").ok(require("node:fs").readFileSync("README.md","utf8").includes("Fixture"))'],inputs:['README.md'],timeout_ms:2000}};
-  const result=await watchJobResult(h.inbox,h.job.task_id,{deadlineMs:2000,checks,review:({artifacts})=>{reviews++;assert.match(artifacts.result,/Fixture/);return {accepted:true};}});
+  const result=await watchJobResult(h.inbox,h.job.task_id,{deadlineMs:2000,checks,review:context=>{reviews++;assert.match(context.artifacts.result,/Fixture/);return parentReview(context);}});
   assert.equal(result.status,'VERIFIED');assert.equal(reviews,1);assert.equal(h.inbox.get(h.job.task_id).host_receipt.checks[0].passed,true);
  }finally{h.close();}
  const h2=setup();try{

@@ -1,3 +1,4 @@
+import {parentReview} from '../desktop-review-fixtures.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,existsSync,rmSync} from 'node:fs';
@@ -40,7 +41,7 @@ test('MOCK job reaches RESULT_READY; only fresh host checks and parent review re
  assert.ok(under(resolve(ROOT,'state'),resolve(reportPath)),'Mock output stays under canonical ignored state');
  assert.match(JSON.parse(original).findings.join('\n'),/Offline fixture evidence/);
  let reviews=0;
- await verifyJob(h.inbox,h.job.task_id,{checks,review:async context=>{reviews++;assert.match(JSON.stringify(context),/Offline fixture evidence/);return {accepted:true,notes:['Compared findings with the actual README.']};}});
+ await verifyJob(h.inbox,h.job.task_id,{checks,review:async context=>{reviews++;assert.match(JSON.stringify(context),/Offline fixture evidence/);return parentReview(context,['Compared findings with the actual README.']);}});
  assert.equal(reviews,1);assert.equal(h.record().state,'VERIFIED');
  const receipt=h.record().host_receipt;
  assert.equal(receipt.report_sha256,hash(original));assert.equal(receipt.accepted,true);

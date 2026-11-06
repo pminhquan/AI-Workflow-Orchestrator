@@ -1,7 +1,9 @@
+import {withTransactionLock} from './transaction-lock.mjs';
 import {randomUUID} from 'node:crypto';
 import {openSync,closeSync,readSync,writeFileSync,fsyncSync,fstatSync,mkdirSync,renameSync,unlinkSync,linkSync,existsSync,readdirSync,lstatSync} from 'node:fs';
 import {ROOT,scopedPath,safeRelative,sha256,inScope} from '../core/util.mjs';
 import {UUID,canonicalWorkspace,sameWorkspace,validateJob,validateReport,validateScopePath,validateSnapshotPath,MAX_REPORT_BYTES,boundedJSON,noKnownSecrets,originalReportRelativePath} from './contracts.mjs';
+import {validateParentReview} from './review-evidence.mjs';
 
 const HASH=/^[a-f0-9]{64}$/;
 const STATES=['PENDING','CLAIMED','DISPATCHED','RESULT_READY','VERIFIED'];
@@ -63,10 +65,7 @@ export class Inbox{
    mkdirSync(scopedPath(this.root,'tasks'),{recursive:true});
   });
  }
- transaction(fn){
-  let fd;try{fd=openSync(this.lockPath,'wx');}catch(error){throw Error('Inbox transaction locked; abandoned locks require manual review: '+error.code);}
-  try{return fn();}finally{closeSync(fd);unlinkSync(this.lockPath);}
- }
+ transaction(fn){return withTransactionLock(this.lockPath,fn);}
  taskPath(taskId,name='record.json'){return scopedPath(this.root,'tasks/'+id(taskId)+'/'+safeRelative(name));}
  validateRecord(record){
   const keys=['format','job','state','outcome','claim_id','baseline','delivery','report_sha256','report_original_path','host_receipt','events'];
@@ -175,7 +174,7 @@ export class Inbox{
    if(record.state!=='RESULT_READY'||['CANCELLED','RELEASED'].includes(record.outcome))throw Error('Result is not eligible for parent verification');
    boundedJSON(receipt,65536,'Host receipt');
    const required=['kind','task_id','attempt_id','workspace_root','report_sha256','job_sha256','baseline_sha256','after_sha256','checks','actual_changed_files','accepted','verified_at'];
-   if(!receipt||Object.keys(receipt).some(key=>![...required,'review_notes'].includes(key))||required.some(key=>!Object.hasOwn(receipt,key))||receipt.kind!=='desktop-inbox.host-receipt@1'||receipt.accepted!==true||receipt.task_id!==taskId||receipt.attempt_id!==record.job.attempt_id||!sameWorkspace(receipt.workspace_root,record.job.workspace_root)||receipt.report_sha256!==record.report_sha256||receipt.job_sha256!==sha256(record.job)||receipt.baseline_sha256!==record.baseline.hash||!HASH.test(receipt.after_sha256)||!Number.isFinite(Date.parse(receipt.verified_at)))throw Error('Host receipt does not match job, report and baseline');
+   if(!receipt||Object.keys(receipt).some(key=>![...required,'review_notes','review_evidence'].includes(key))||required.some(key=>!Object.hasOwn(receipt,key))||receipt.kind!=='desktop-inbox.host-receipt@1'||receipt.accepted!==true||receipt.task_id!==taskId||receipt.attempt_id!==record.job.attempt_id||!sameWorkspace(receipt.workspace_root,record.job.workspace_root)||receipt.report_sha256!==record.report_sha256||receipt.job_sha256!==sha256(record.job)||receipt.baseline_sha256!==record.baseline.hash||!HASH.test(receipt.after_sha256)||!Number.isFinite(Date.parse(receipt.verified_at)))throw Error('Host receipt does not match job, report and baseline');
    const verifiedAt=Date.parse(receipt.verified_at);if(verifiedAt>this.now()+30000||this.now()-verifiedAt>60000)throw Error('Stale host receipt');
    const {raw,value}=readBounded(scopedPath(this.root,record.job.expected_output),MAX_REPORT_BYTES);
    const report=validateReport(value,record.job);
@@ -184,6 +183,7 @@ export class Inbox{
    if(!Array.isArray(receipt.checks)||receipt.checks.length!==record.job.verification_commands.length||new Set(receipt.checks.map(check=>check.check_id)).size!==receipt.checks.length||receipt.checks.some(check=>!record.job.verification_commands.includes(check.check_id)||check.exit_code!==0||check.passed!==true))throw Error('Fresh host checks did not pass');
    if(!Array.isArray(receipt.actual_changed_files)||new Set(receipt.actual_changed_files).size!==receipt.actual_changed_files.length||JSON.stringify([...receipt.actual_changed_files].sort())!==JSON.stringify([...report.changed_files].sort()))throw Error('Host actual changes do not match report');
    for(const path of receipt.actual_changed_files){validateScopePath(record.job.workspace_root,path);if(!inScope(path,record.job.write_scope))throw Error('Host found unexpected workspace changes');}
+   validateParentReview(receipt.review_evidence,{job:record.job,...receipt});
    record.host_receipt=clone(receipt);record.state='VERIFIED';record.outcome=null;this.event(record,'Codex parent accepted independently checked result');
   });
  }

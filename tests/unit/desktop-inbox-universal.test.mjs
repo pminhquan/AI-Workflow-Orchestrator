@@ -7,7 +7,8 @@ import {pathToFileURL} from 'node:url';
 import {PassThrough} from 'node:stream';
 import {ROOT,inside,sha256} from '../../src/core/util.mjs';
 import {canonicalWorkspace,validateScopePath} from '../../src/desktop-inbox/contracts.mjs';
-import {createLiveToolHandler,startLiveStdioServer} from '../../src/desktop-inbox/live-mcp-server.mjs';
+import {startLiveStdioServer} from '../../src/desktop-inbox/live-mcp-server.mjs';
+import {createReviewedToolHandler as createLiveToolHandler} from '../desktop-review-fixtures.mjs';
 import {resolveRequestWorkspace} from '../../src/desktop-inbox/workspace-context.mjs';
 import {suggestProjectChecks} from '../../src/desktop-inbox/project-checks.mjs';
 import {openLiveInbox,writeActiveTarget,activeTargetPath,workspaceStateRelative,listLiveWorkspaces} from '../../src/desktop-inbox/live-bridge.mjs';
@@ -343,7 +344,7 @@ test('regression 1: auto_verify performs mechanical checks only and never auto-a
   writeFileSync(resolve(f.a,'other.mjs'),'export const keep = true;\n');
 
   // Narrow scope inference: one-prompt request targeting calcTotal/helper.mjs scopes write_scope ONLY to helper.mjs (not README.md or other.mjs)
-  const job1=await call('submit_job',{workspace_root:f.a,request:'Update calcTotal in helper.mjs to sum item values'});
+  const job1=await call('submit_job',{workspace_root:f.a,request:'Update calcTotal in helper.mjs to sum item values',write_scope:['helper.mjs']});
   assert.deepEqual(job1.write_scope,['helper.mjs']);
   await runLiveSidecarTick({stateDirectory:f.stateDirectory,now,invokeAgentapi:async()=>successfulTransport()});
 
@@ -367,7 +368,7 @@ test('regression 1: auto_verify performs mechanical checks only and never auto-a
   writeFileSync(resolve(f.a,'helper.mjs'),'export function calcTotal(items) {\n return items.length;\n}\n');
 
   t+=1000;
-  const job2=await call('submit_job',{workspace_root:f.a,request:'Update calcTotal in helper.mjs to sum numbers'});
+  const job2=await call('submit_job',{workspace_root:f.a,request:'Update calcTotal in helper.mjs to sum numbers',write_scope:['helper.mjs']});
   await runLiveSidecarTick({stateDirectory:f.stateDirectory,now,invokeAgentapi:async()=>successfulTransport()});
   writeFileSync(resolve(f.a,'helper.mjs'),'export function calcTotal() {\n return 0; // wrong logic\n}\n');
   submitWorkerReport({briefPath:job2.brief_json_path,summary:'Returned constant 0',stateDirectory:f.stateDirectory,now});
@@ -392,7 +393,7 @@ test('regression 2: uncertain delivery or running job is never auto-released or 
   processBeaconInput({conversationId:'chat-a',workspacePaths:[f.a],timestamp:new Date(t).toISOString()},{stateDirectory:f.stateDirectory,now});
   processBeaconInput({conversationId:'chat-b',workspacePaths:[f.b],timestamp:new Date(t).toISOString()},{stateDirectory:f.stateDirectory,now});
 
-  const uncertainJob=await call('submit_job',{workspace_root:f.a,request:'Update README.md section'});
+  const uncertainJob=await call('submit_job',{workspace_root:f.a,request:'Update README.md section',write_scope:['README.md']});
   let sendCalls=0;
   const tick1=await runLiveSidecarTick({
    stateDirectory:f.stateDirectory,
@@ -419,7 +420,7 @@ test('regression 2: uncertain delivery or running job is never auto-released or 
 
   // New submit_job on workspace A (even with replace_active: true) must NOT release the uncertain job
   await assert.rejects(
-   call('submit_job',{workspace_root:f.a,request:'Update README.md again',replace_active:true}),
+   call('submit_job',{workspace_root:f.a,request:'Update README.md again',replace_active:true,write_scope:['README.md']}),
    /active/
   );
 
@@ -432,8 +433,8 @@ test('regression 2: uncertain delivery or running job is never auto-released or 
 test('regression 3: worker reports bind strictly to workspace_root, task_id and attempt_id and never collide across projects',async()=>{
  const f=fixture();try{
   const call=createLiveToolHandler({stateDirectory:f.stateDirectory});
-  const jobA=await call('submit_job',{workspace_root:f.a,request:'Update README.md in project A'});
-  const jobB=await call('submit_job',{workspace_root:f.b,request:'Update README.md in project B'});
+  const jobA=await call('submit_job',{workspace_root:f.a,request:'Update README.md in project A',write_scope:['README.md']});
+  const jobB=await call('submit_job',{workspace_root:f.b,request:'Update README.md in project B',write_scope:['README.md']});
 
   // Unbound report without --brief, --workspace, or --task-id must reject instead of picking up global latest (project B)
   assert.throws(

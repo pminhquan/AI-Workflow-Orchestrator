@@ -9,8 +9,19 @@ export const MAX_REPORT_BYTES=32768;
 export const MAX_JOB_AGE_MS=10*60*1000;
 export const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const secretPatterns=[/\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/,/\bAIza[\w-]{35}\b/,/\bgh[pousr]_[A-Za-z0-9]{20,}\b/,/\bsk-[A-Za-z0-9_-]{24,}\b/,/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,/(?:authorization\s*[:=]\s*bearer|aws_secret_access_key\s*[:=])\s*[A-Za-z0-9/+_=.-]{8,}/i];
-const sensitive=/^(?:\.git|\.aws|\.ssh|\.gemini|\.codex|\.antigravity|\.azure|\.gcp|\.config|\.netrc|\.npmrc|\.pypirc|\.env(?:\..*)?|sessions?|transcripts?|cookies?[^/]*|credentials?[^/]*|tokens?[^/]*|auth(?:entication)?(?:\..*)?|oauth(?:[-_.].*)?|secrets?(?:\..*)?|keyring(?:[-_.].*)?|application_default_credentials\.json|mcp_config\.json|bridge\.config\.json|id_rsa.*|id_ed25519.*)$/i;
-export const isSensitivePath=path=>path.split('/').some(part=>sensitive.test(part)||/\.(?:pem|key|sqlite\d*|db|p12|pfx|kdbx)$/i.test(part));
+const privateComponent=/^(?:\.git|\.aws|\.ssh|\.gemini|\.codex|\.antigravity|\.azure|\.gcp|\.config|\.netrc|\.npmrc|\.pypirc|\.env(?:\..*)?|id_rsa.*|id_ed25519.*)$/i;
+const privateFile=/^(?:\.?(?:credentials?|tokens?|cookies?|cookiejar|auth(?:entication)?|oauth|secrets?|keyring)(?:[-_.][A-Za-z0-9_-]+)*\.(?:json|jsonl|ya?ml|toml|ini|cfg|conf|txt)|application_default_credentials\.json|mcp_config\.json|bridge\.config\.json)$/i;
+const bareCredentialStore=/^(?:credentials?|tokens?|cookies?|cookiejar|keyring)$/i;
+const privateRuntimeRoot=/^(?:sessions?|transcripts?|cookies?|credentials?|tokens?|keyring)$/i;
+// Protect known credential/runtime paths, not source identifiers such as
+// auth.js, tokenizer.py, token_utils.py or src/auth/handlers.js.
+export const isSensitivePath=(path,{directory=false}={})=>{
+ const parts=path.split('/');
+ if(parts.some(part=>privateComponent.test(part)||/\.(?:pem|key|sqlite\d*|db|p12|pfx|kdbx)$/i.test(part)))return true;
+ if(privateRuntimeRoot.test(parts[0]))return true;
+ const leaf=parts.at(-1);
+ return privateFile.test(leaf)||(!directory&&bareCredentialStore.test(leaf));
+};
 
 export function boundedJSON(value,limit,label='Payload'){
  let text;try{text=JSON.stringify(value);}catch{throw Error(label+' is not serializable JSON');}
@@ -31,8 +42,10 @@ export function canonicalWorkspace(root){
 export function sameWorkspace(left,right){const a=canonicalWorkspace(left),b=canonicalWorkspace(right);return process.platform==='win32'?a.toLowerCase()===b.toLowerCase():a===b;}
 export function validateScopePath(workspace,path){
  safeRelative(path);
- if(path.length>240||/[*?<>|"\x7f]/.test(path)||isSensitivePath(path))throw Error('Sensitive or unsupported scope path');
- return scopedPath(workspace,path);
+ if(path.length>240||/[*?<>|"\x7f]/.test(path))throw Error('Sensitive or unsupported scope path');
+ const full=scopedPath(workspace,path);
+ if(isSensitivePath(path,{directory:lstatSync(full,{throwIfNoEntry:false})?.isDirectory()}))throw Error('Sensitive or unsupported scope path');
+ return full;
 }
 // The parent fingerprints its explicitly managed project MCP configuration.
 // This exception does not make private config available to worker read/write scopes.

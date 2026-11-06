@@ -1,3 +1,4 @@
+import {reviewedReceipt} from '../desktop-review-fixtures.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -179,7 +180,7 @@ test('full VERIFIED lifecycle starting at epoch timestamp 0 derives exact 6 phas
 
     // 6. Parent verifies at t = 1400ms
     clockMs = 1400;
-    const verifiedRecord = inbox.verify(job.task_id, {
+    const verifiedRecord = inbox.verify(job.task_id, reviewedReceipt(job, {
       kind: 'desktop-inbox.host-receipt@1',
       task_id: job.task_id,
       attempt_id: job.attempt_id,
@@ -192,7 +193,7 @@ test('full VERIFIED lifecycle starting at epoch timestamp 0 derives exact 6 phas
       actual_changed_files: [],
       accepted: true,
       verified_at: new Date(clockMs).toISOString()
-    });
+    }));
 
     const derived = deriveTaskTelemetry(verifiedRecord);
     assert.equal(derived.task_id, job.task_id);
@@ -560,7 +561,7 @@ test('bridgeMetrics CLI integration preserves legacy fields and exposes phase an
     writeValidWorkerReport(inbox, job1, ['subtask took 12ms; subagent_wakeup_ms=9ms']);
     const ready1 = inbox.acceptReport(job1.task_id);
     clockMs += 100;
-    inbox.verify(job1.task_id, {
+    inbox.verify(job1.task_id, reviewedReceipt(job1, {
       kind: 'desktop-inbox.host-receipt@1',
       task_id: job1.task_id,
       attempt_id: job1.attempt_id,
@@ -573,7 +574,7 @@ test('bridgeMetrics CLI integration preserves legacy fields and exposes phase an
       actual_changed_files: [],
       accepted: true,
       verified_at: new Date(clockMs).toISOString()
-    });
+    }));
 
     // Task 2: FAILED pre-spawn ENOENT task (released afterwards -> bucket 'released')
     clockMs += 1000;

@@ -50,7 +50,7 @@ Chat mới chưa phát hook cần một tin nhắn khởi tạo. Hook ghi conver
 1. Codex chia phần độc lập, acceptance rõ và file ownership không chồng lấn.
 2. Gửi job; tiếp tục phần việc của parent. Kiểm tra khoảng mỗi **5 phút**, hoặc khi có completion/error event, tránh lặp các lần chờ ngắn.
 3. Worker chạy checks an toàn trong scope rồi dùng lệnh `report-cli --run-checks` với absolute brief path được cung cấp.
-4. Parent đọc source/diff và report, chạy checks mới, rồi verify hoặc giao lượt rework cụ thể.
+4. Parent đọc source/diff và report, đánh giá từng acceptance criterion và chạy checks mới. Lấy binding từ `auto_verification.review_context`, thêm files inspected, acceptance assessment, notes và check results vào `review_evidence` khi gọi `verify_job`. `accepted`/`review_notes` riêng lẻ không đủ; metadata chỉ là parent assertion, không chứng minh AI đã đọc code.
 5. Tiếp tục giao milestone hữu ích tiếp theo; không dồn hết phần còn lại cho parent.
 
 | Trạng thái | Bằng chứng |
@@ -72,3 +72,13 @@ Unit/integration fixtures dùng mocked transport là **OFFLINE-TESTED**. Trong m
 Chẩn đoán: `bridge-cli.mjs doctor --workspace <absolute-root>`, `status`, `metrics`. Gỡ job cụ thể bằng `release_job`; đừng coi release là đã dừng Worker.
 
 Tài liệu phạm vi cấu hình: [Codex config](https://learn.chatgpt.com/docs/config-file/config-basic), [Codex skills](https://learn.chatgpt.com/docs/build-skills), [Antigravity hooks](https://antigravity.google/docs/hooks), [Sidecars](https://antigravity.google/docs/sidecars).
+
+## Correctness and trusted checks
+
+Codex đọc source liên quan rồi gửi explicit `write_scope`; API không tự cấp scope từ token trùng tên. Source auth/token không phải credential store; `.env`, private keys và runtime folders vẫn bị bảo vệ. Snapshot dùng chung traversal, prune dependency/cache ở mọi độ sâu, giữ tracked ordinary source dưới build-like names, bỏ qua unmanaged links và từ chối tracked/explicit links. Baseline/final verification hash mới; cache chỉ advisory.
+
+Trusted checks đăng ký executable + args trong central configuration; không lấy command từ prompt hoặc tự chạy framework scripts. Mặc định `shell:false`; shell:true chưa hỗ trợ vì chưa có nhu cầu được kiểm chứng. Runner có timeout tối đa 15 phút và cleanup process tree; parent MCP timeout hiện hữu là 120 giây nên end-to-end long parent-MCP checks chưa được xác minh. `noop` không chứng minh functional tests PASS.
+
+Project mới có thể chỉ có `noop`. Codex cần review command/source inputs thực tế, rồi dùng `registerLocalWorkspace` từ absolute module path của bridge đã cài để đăng ký check vào central ignored state. Không cần user tự tạo config hoặc UUID trong project; không đăng ký command chỉ vì xuất hiện trong prompt hay framework detection.
+
+Agentapi ưu tiên executable trên PATH theo tài liệu App-owned Sidecar. Không gọi get-conversation-metadata hoặc ghi đè project environment. Custom CLI cũ chỉ là compatibility route NOT VERIFIED nếu PATH thiếu; không fallback/retry sau khi đã gửi. Target observations hết TTL được dọn dưới lock, giữ active/selected/in-flight receiver. Transaction lock chỉ recover PID được xác minh đã chết; live/unknown owner giữ fail-closed.

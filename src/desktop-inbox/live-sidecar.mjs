@@ -1,6 +1,6 @@
 import {spawn} from 'node:child_process';
-import {existsSync,mkdirSync,openSync,readFileSync,writeFileSync,closeSync,unlinkSync,watch} from 'node:fs';
-import {resolve} from 'node:path';
+import {existsSync,mkdirSync,openSync,readFileSync,writeFileSync,closeSync,unlinkSync,watch,statSync,accessSync,constants,realpathSync} from 'node:fs';
+import {resolve,isAbsolute,delimiter} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {ROOT,scopedPath,sha256} from '../core/util.mjs';
 import {MAX_JOB_AGE_MS} from './contracts.mjs';
@@ -54,7 +54,7 @@ function acquireProcessLock(lockPath){
 const SIDECAR_CODE_VERSION='2.6.0';
 const WATCHED_MODULES=[
  fileURLToPath(import.meta.url),
- ...['live-bridge','selected-receiver','readiness','contracts','inbox'].map(name=>scopedPath(ROOT,`src/desktop-inbox/${name}.mjs`))
+ ...['live-bridge','selected-receiver','readiness','contracts','inbox','transaction-lock'].map(name=>scopedPath(ROOT,`src/desktop-inbox/${name}.mjs`))
 ];
 
 function computeCodeFingerprint(){
@@ -65,25 +65,53 @@ function computeCodeFingerprint(){
  }
 }
 
-export function resolveAgentapiCommand(argv,env=process.env){
- const customExe=typeof env?.ANTIGRAVITY_AGENTAPI_EXE==='string'?env.ANTIGRAVITY_AGENTAPI_EXE.trim():'';
- if(customExe){
-  return {executable:customExe,args:['agentapi',...argv],source:'ANTIGRAVITY_AGENTAPI_EXE'};
+function agentapiExecutable(path){
+ try{
+  if(!isAbsolute(path)||/\.(?:cmd|bat)$/i.test(path)||!statSync(path).isFile())return null;
+  if(process.platform!=='win32')accessSync(path,constants.X_OK);
+  return realpathSync(path);
+ }catch{return null;}
+}
+
+function pathAgentapi(env){
+ const key=Object.keys(env??{}).filter(name=>name.toUpperCase()==='PATH').sort()[0];
+ const raw=key?String(env[key]??''):'';
+ if(raw.length>32768)return null;
+ for(const entry of raw.split(delimiter).slice(0,128)){
+  const directory=entry.replace(/^"(.*)"$/,'$1');
+  if(!isAbsolute(directory))continue;
+  for(const name of process.platform==='win32'?['agentapi.exe','agentapi.com','agentapi']:['agentapi']){
+   const candidate=agentapiExecutable(resolve(directory,name));
+   if(candidate)return candidate;
+  }
  }
- return {executable:'agentapi',args:[...argv],source:'PATH'};
+ return null;
+}
+
+export function resolveAgentapiCommand(argv,env=process.env){
+ const documented=pathAgentapi(env);
+ if(documented)return {executable:documented,args:[...argv],source:'PATH',support:'DOCUMENTED'};
+ const custom=typeof env?.ANTIGRAVITY_AGENTAPI_EXE==='string'?env.ANTIGRAVITY_AGENTAPI_EXE.trim():'';
+ const legacy=custom?agentapiExecutable(custom):null;
+ if(legacy)return {executable:legacy,args:['agentapi',...argv],source:'ANTIGRAVITY_AGENTAPI_EXE',support:'LEGACY_COMPAT_NOT_VERIFIED'};
+ return {executable:null,args:[...argv],source:'UNAVAILABLE',support:'UNAVAILABLE'};
 }
 
 export function inspectAgentapiEnv(env=process.env){
- const customExe=typeof env?.ANTIGRAVITY_AGENTAPI_EXE==='string'?env.ANTIGRAVITY_AGENTAPI_EXE.trim():'';
- const lsAddress=typeof env?.ANTIGRAVITY_LS_ADDRESS==='string'?env.ANTIGRAVITY_LS_ADDRESS.trim():'';
+ const command=resolveAgentapiCommand([],env);
  return {
-  agentapi_source:customExe?'ANTIGRAVITY_AGENTAPI_EXE':'PATH',
-  agentapi_available:customExe?existsSync(customExe):false,
-  ls_address_present:Boolean(lsAddress)
+  agentapi_source:command.source,
+  agentapi_available:command.executable!==null,
+  agentapi_support:command.support,
+  path_agentapi_available:command.source==='PATH',
+  legacy_compatibility:command.source==='ANTIGRAVITY_AGENTAPI_EXE',
+  // Kept for old heartbeat readers; not a dependency of the documented PATH route.
+  ls_address_present:Boolean(typeof env?.ANTIGRAVITY_LS_ADDRESS==='string'&&env.ANTIGRAVITY_LS_ADDRESS.trim())
  };
 }
 
-function spawnAgentapiOnce(executable,args,{timeoutMs=15000,signal,cwd,env=process.env,captureStdoutText=false}={}){
+
+function spawnAgentapiOnce(executable,args,{timeoutMs=15000,signal,cwd,env=process.env}={}){
  return new Promise(resolveCall=>{
   let started=false,spawnError=null,timedOut=false,overflow=false;
   let stdout=Buffer.alloc(0),stderr=Buffer.alloc(0);
@@ -121,7 +149,11 @@ function spawnAgentapiOnce(executable,args,{timeoutMs=15000,signal,cwd,env=proce
     stdout_bytes:stdout.length,
     stderr_bytes:stderr.length
    };
-   if(captureStdoutText)out.stdout_text=stdout.toString('utf8');
+   if(spawnError||timedOut||overflow||exit_code!==0){
+    const known=Buffer.concat([stderr,stdout]).toString('utf8').match(/\b(?:ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|UNAUTHENTICATED|PERMISSION_DENIED|NOT_FOUND)\b/)?.[0];
+    out.diagnostic_code=spawnError??(timedOut?'TRANSPORT_TIMEOUT':overflow?'TRANSPORT_OUTPUT_LIMIT':known??'AGENTAPI_NONZERO_EXIT');
+    out.diagnostic_summary=('agentapi transport did not confirm successful completion ('+out.diagnostic_code+'); delivery may be uncertain.').slice(0,240);
+   }
    resolveCall(out);
   });
  });
@@ -129,32 +161,17 @@ function spawnAgentapiOnce(executable,args,{timeoutMs=15000,signal,cwd,env=proce
 
 export async function defaultInvokeAgentapi(argv,{timeoutMs=15000,signal,cwd,env=process.env}={}){
  const resolved=resolveAgentapiCommand(argv,env);
- let childEnv=env;
- if(resolved.source==='ANTIGRAVITY_AGENTAPI_EXE'&&argv[0]==='send-message'&&typeof argv[1]==='string'&&argv[1].length>0){
-  try{
-   const metaCall=await spawnAgentapiOnce(resolved.executable,['agentapi','get-conversation-metadata',argv[1]],{
-    timeoutMs:Math.min(3500,timeoutMs),
-    signal,
-    cwd,
-    env,
-    captureStdoutText:true
-   });
-   if(metaCall.started&&metaCall.exit_code===0&&!metaCall.timed_out&&metaCall.stdout_text){
-    const parsed=JSON.parse(metaCall.stdout_text);
-    const meta=parsed?.response?.conversationMetadata?.metadata
-     ??parsed?.response?.conversation_metadata?.metadata
-     ??parsed?.conversationMetadata?.metadata
-     ??parsed?.metadata
-     ??null;
-    const rawProjectId=meta?.projectId??meta?.project_id;
-    const detectedProjectId=typeof rawProjectId==='string'?rawProjectId.trim():'';
-    if(detectedProjectId)childEnv={...env,ANTIGRAVITY_PROJECT_ID:detectedProjectId};
-   }
-  }catch{}
- }
- const call=await spawnAgentapiOnce(resolved.executable,resolved.args,{timeoutMs,signal,cwd,env:childEnv});
- return {...call,executable_source:resolved.source};
+ if(!resolved.executable)return {
+  started:false,spawn_error:'ENOENT',exit_code:null,exit_signal:null,timed_out:false,output_overflow:false,
+  stdout_sha256:sha256(''),stderr_sha256:sha256(''),stdout_bytes:0,stderr_bytes:0,
+  executable_source:resolved.source,transport_support:resolved.support,
+  diagnostic_code:'EXECUTABLE_NOT_FOUND',diagnostic_summary:'No usable agentapi executable was found on absolute PATH entries or the configured legacy compatibility path.'
+ };
+ // Exactly one send. No undocumented metadata lookup, project-env rewrite, or fallback after failure.
+ const call=await spawnAgentapiOnce(resolved.executable,resolved.args,{timeoutMs,signal,cwd,env});
+ return {...call,executable_source:resolved.source,transport_support:resolved.support};
 }
+
 
 export async function runLiveSidecarTick({
  stateDirectory=DEFAULT_LIVE_STATE,

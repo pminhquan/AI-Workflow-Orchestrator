@@ -1,3 +1,4 @@
+import {reviewedReceipt} from '../desktop-review-fixtures.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -20,7 +21,7 @@ function setup(){
  function report(job,extra={}){return {schema_version:'desktop-inbox.report@1',task_id:job.task_id,attempt_id:job.attempt_id,workspace:job.workspace_root,status:'reported',inspected_files:['README.md'],changed_files:[],tests:[],findings:['README describes the fixture.'],blockers:[],errors:[],evidence:['README.md inspected'],...extra};}
  function writeReport(job,extra={}){const value=report(job,extra),path=resolve(store.root,job.expected_output);writeFileSync(path,JSON.stringify(value,null,2)+'\n');return {value,path};}
  function dispatch(job){store.submit(job,{baseline});const claimed=store.claim(job.task_id);store.beginDispatch(job.task_id,claimed.claim_id);return claimed.claim_id;}
- function receipt(job,extra={}){const record=store.get(job.task_id);return {kind:'desktop-inbox.host-receipt@1',task_id:job.task_id,attempt_id:job.attempt_id,workspace_root:workspace,report_sha256:record.report_sha256,job_sha256:sha256(job),baseline_sha256:baseline.hash,after_sha256:baseline.hash,checks:[{check_id:'readme-check',exit_code:0,passed:true,output:'independent host check'}],actual_changed_files:[],accepted:true,verified_at:new Date(now()).toISOString(),...extra};}
+ function receipt(job,extra={}){const record=store.get(job.task_id);return reviewedReceipt(job,{kind:'desktop-inbox.host-receipt@1',task_id:job.task_id,attempt_id:job.attempt_id,workspace_root:workspace,report_sha256:record.report_sha256,job_sha256:sha256(job),baseline_sha256:baseline.hash,after_sha256:baseline.hash,checks:[{check_id:'readme-check',exit_code:0,passed:true,output:'independent host check'}],actual_changed_files:[],accepted:true,verified_at:new Date(now()).toISOString(),...extra});}
  return {rel,dir,workspace,binding,store,now,job,baseline,report,writeReport,dispatch,receipt,advance(ms){time+=ms;},close(){const state=resolve(ROOT,'state');assert.ok(inside(state,dir)&&dir!==state);rmSync(dir,{recursive:true,force:true});}};
 }
 
