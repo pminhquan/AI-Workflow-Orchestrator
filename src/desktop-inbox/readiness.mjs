@@ -304,17 +304,11 @@ export function inspectWorkspaceReadiness({
  const sampledNowMs=resolveNowMs(clockFn);
  let targetAmbiguous=false,candidateError=null;
  try{
-  const activeMs=isPlainObject(rawTarget.value)?parseStrictIsoMs(rawTarget.value.updated_at):null;
   const candidates=readTargetCandidates(config.workspace_root,{stateDirectory:checkedState});
   const freshIds=new Set();
   for(const target of candidates){
    const checked=evaluateBridgeReadiness({workspaceRoot:config.workspace_root,projectId:config.slug,target,heartbeat:rawHeartbeat.value,now:sampledNowMs,targetTtlMs});
-   if(checked.target_observation.bound&&checked.target_observation.fresh){
-    const candidateMs=parseStrictIsoMs(target.updated_at);
-    if(activeMs===null||(candidateMs!==null&&candidateMs>=activeMs)){
-     freshIds.add(target.conversation_id);
-    }
-   }
+   if(checked.target_observation.bound&&checked.target_observation.fresh)freshIds.add(target.conversation_id);
   }
   targetAmbiguous=freshIds.size>1;
  }catch(error){candidateError=error.message;}

@@ -1,4 +1,5 @@
 import {existsSync,lstatSync,readdirSync,realpathSync,openSync,fstatSync,readSync,closeSync} from 'node:fs';
+import {spawnSync} from 'node:child_process';
 import {isAbsolute,relative} from 'node:path';
 import {sha256,scopedPath} from '../core/util.mjs';
 import {changedFiles,verifyScope,CheckRunner} from '../verification/checks.mjs';
@@ -89,17 +90,107 @@ export function inspectHandoffArtifacts(job) {
       errors_source:Object.hasOwn(original,'errors')?'report.json':'explicit worker no-errors declaration in result.md'}};
 }
 
+export function validateChangedSourceSyntax(workspaceRoot,actualChanged) {
+  for (const rel of actualChanged) {
+    const full = scopedPath(workspaceRoot,rel);
+    if (!existsSync(full) || !lstatSync(full).isFile()) continue;
+    if (/\.json$/i.test(rel)) {
+      try {
+        JSON.parse(readBoundedBytes(full,MAX_WORKSPACE_FILE_BYTES).toString('utf8'));
+      } catch (err) {
+        throw Error('Invalid JSON syntax in changed file '+rel+': '+err.message);
+      }
+    } else if (/\.(mjs|cjs|js)$/i.test(rel)) {
+      const check = spawnSync(process.execPath,['--check',full],{cwd:workspaceRoot,windowsHide:true,timeout:5000,encoding:'utf8'});
+      if (check.status !== 0) {
+        throw Error('Syntax check failed for changed file '+rel+': '+String(check.stderr || check.stdout || 'syntax error').trim().slice(0,240));
+      }
+    }
+  }
+}
+
+export async function runMechanicalVerification(inbox,taskId,{checks = {},snapshot = captureWorkspace} = {}) {
+  let record = null, job = null;
+  try {
+    record = inbox.get(taskId);
+    job = record.job;
+    if (record.state !== 'RESULT_READY') throw Error('Only RESULT_READY can be verified');
+    if (record.outcome === 'CANCELLED') throw Error('Cancelled task cannot be verified');
+    if (record.outcome === 'RELEASED') throw Error('Released task cannot be verified');
+    if (record.outcome === 'FAILED') throw Error('Failed task cannot be verified');
+    const report = readReport(inbox,record);
+    if (report.status !== 'reported' || report.blockers.length || report.errors.length) throw Error('Worker blocked/failed or reported errors; parent acceptance unavailable');
+    const before = snapshot(job.workspace_root);
+    const actual = changedFiles(record.baseline,before);
+    verifyScope(actual,report.changed_files,job.write_scope);
+    validateChangedSourceSyntax(job.workspace_root,actual);
+    const specs = {};
+    for (const id of job.verification_commands) {
+      if (!Object.hasOwn(checks,id)) throw Error('Unknown trusted host check: '+id);
+      specs[id] = {...structuredClone(checks[id]),cacheable:false};
+    }
+    const runner = new CheckRunner(specs), receipts = [];
+    for (const id of job.verification_commands) {
+      const receipt = await runner.run(job.workspace_root,id);
+      receipts.push({check_id:id,exit_code:receipt.exit_code,passed:receipt.passed,
+        output:receipt.output,input_hash:receipt.input_hash,spec_hash:receipt.spec_hash,
+        executed_at:receipt.executed_at,reused:receipt.reused});
+      if (!receipt.passed || receipt.reused) throw Error('Fresh host check failed: '+id);
+    }
+    const after = snapshot(job.workspace_root);
+    if (before.hash !== after.hash) throw Error('Workspace changed during parent verification');
+    readReport(inbox,record);
+    return {
+      passed:true,
+      mechanical_only:true,
+      verified:false,
+      requires_parent_review:true,
+      task_id:job.task_id,
+      attempt_id:job.attempt_id,
+      workspace_root:job.workspace_root,
+      baseline_hash:record.baseline.hash,
+      snapshot_hash:before.hash,
+      report_sha256:record.report_sha256,
+      actual_changed_files:actual,
+      scope_valid:true,
+      checks:receipts,
+      acceptance_criteria:structuredClone(job.acceptance_criteria),
+      error:null
+    };
+  } catch (err) {
+    return {
+      passed:false,
+      mechanical_only:true,
+      verified:false,
+      requires_parent_review:true,
+      task_id:job?.task_id ?? taskId,
+      attempt_id:job?.attempt_id ?? null,
+      workspace_root:job?.workspace_root ?? null,
+      baseline_hash:record?.baseline?.hash ?? null,
+      snapshot_hash:null,
+      report_sha256:record?.report_sha256 ?? null,
+      actual_changed_files:[],
+      scope_valid:false,
+      checks:[],
+      acceptance_criteria:structuredClone(job?.acceptance_criteria ?? []),
+      error:err.message
+    };
+  }
+}
+
 export async function verifyJob(inbox,taskId,{checks = {},review,snapshot = captureWorkspace} = {}) {
   const record = inbox.get(taskId), job = record.job;
   if (record.state !== 'RESULT_READY') throw Error('Only RESULT_READY can be verified');
   if (record.outcome === 'CANCELLED') throw Error('Cancelled task cannot be verified');
   if (record.outcome === 'RELEASED') throw Error('Released task cannot be verified');
+  if (record.outcome === 'FAILED') throw Error('Failed task cannot be verified');
   const report = readReport(inbox,record);
   if (report.status !== 'reported' || report.blockers.length || report.errors.length) throw Error('Worker blocked/failed or reported errors; parent acceptance unavailable');
   if (typeof review !== 'function') throw Error('Independent parent source/findings review is required');
   const before = snapshot(job.workspace_root);
   const actual = changedFiles(record.baseline,before);
   verifyScope(actual,report.changed_files,job.write_scope);
+  validateChangedSourceSyntax(job.workspace_root,actual);
   // Fresh runner every acceptance, no cache and no command derived from task text.
   const specs = {};
   for (const id of job.verification_commands) {
@@ -123,6 +214,8 @@ export async function verifyJob(inbox,taskId,{checks = {},review,snapshot = capt
   const hostReceipt = {kind:'desktop-inbox.host-receipt@1',task_id:job.task_id,
     attempt_id:job.attempt_id,workspace_root:job.workspace_root,report_sha256:record.report_sha256,
     job_sha256:sha256(job),baseline_sha256:record.baseline.hash,after_sha256:after.hash,
-    checks:receipts,actual_changed_files:actual,accepted:true,verified_at:new Date().toISOString()};
+    checks:receipts,actual_changed_files:actual,accepted:true,
+    ...(Array.isArray(decision.notes) && decision.notes.length ? {review_notes:decision.notes.map(String)} : {}),
+    verified_at:new Date().toISOString()};
   return inbox.verify(taskId,hostReceipt);
 }

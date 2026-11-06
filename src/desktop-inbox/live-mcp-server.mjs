@@ -6,17 +6,17 @@ import {ROOT,scopedPath,sha256} from '../core/util.mjs';
 import { validate } from '../core/schema.mjs';
 import {changedFiles} from '../verification/checks.mjs';
 import {UUID,MAX_JOB_BYTES,MAX_REPORT_BYTES,MAX_JOB_AGE_MS,boundedJSON,makeJob,validateReport} from './contracts.mjs';
-import {readBoundedBytes,verifyJob} from './verification.mjs';
+import {readBoundedBytes,runMechanicalVerification,verifyJob} from './verification.mjs';
 import {captureWorkspaceFast,getSnapshotCacheStats} from './fast-snapshot.mjs';
 import {SUBTASK_AGENT_TYPES,validateSubtaskPlan} from './subtask-planner.mjs';
 import {
  DEFAULT_LIVE_STATE,
- defaultWorkspaceScopes,
  ensureWorkspaceRegistration,
  buildSingleLineTrigger,
  checkedStateDirectory,
  collectWorkerReport,
  findTaskAcrossWorkspaces,
+ inferJobScopes,
  jobPaths,
  openLiveInbox,
  resolveLatestWorkspaceTask,
@@ -86,7 +86,7 @@ export const LIVE_MCP_TOOLS=[
  },
  {
   name:'wait_job',
-  description:'Event-driven wait until the Antigravity Worker submits its concise summary/report (RESULT_READY), fails/releases, or timeout_sec elapses. Omit task_id to wait on the latest workspace job; set auto_verify=true to verify and close in one step.',
+  description:'Event-driven wait for RESULT_READY, failure/release or timeout. auto_verify=true runs fresh mechanical checks only; independent parent review and verify_job are still required.',
   inputSchema:{
    type:'object',
    additionalProperties:false,
@@ -157,7 +157,7 @@ function formatRecord(inbox,record){
  let actualChangedFiles=null;
  if(record.state==='PENDING')actualChangedFiles=[];
  else if(record.state==='VERIFIED'&&Array.isArray(record.host_receipt?.actual_changed_files))actualChangedFiles=record.host_receipt.actual_changed_files;
- else{
+ else if(record.state==='RESULT_READY'){
   try{actualChangedFiles=changedFiles(record.baseline,captureWorkspaceFast(record.job.workspace_root));}catch{}
  }
  return {
@@ -263,21 +263,23 @@ export function createLiveToolHandler({
      throw Error(`Unknown verification check "${checkId}" for workspace ${config.workspace_root}. Available checks: ${Object.keys(config.checks).join(', ')}`);
     }
    }
-   const zeroCeremony=!args.read_scope?.length;
-   const defaultScopes=zeroCeremony?defaultWorkspaceScopes(config.workspace_root):null;
-   const writeScope=args.write_scope!==undefined?args.write_scope:(zeroCeremony?(args.read_only?[]:defaultScopes):[]);
-   const readScope=args.read_scope?.length?args.read_scope:[...new Set([...defaultScopes,...writeScope])].slice(0,32);
+   const {readScope,writeScope}=inferJobScopes(config.workspace_root,args.request,{
+    readScope:args.read_scope,
+    writeScope:args.write_scope,
+    readOnly:args.read_only,
+    subtasks:args.subtasks
+   });
    const acceptanceCriteria=args.acceptance_criteria?.length?args.acceptance_criteria:['Complete requested task and provide concise summary'];
    const subtaskPlan=args.subtasks?.length
     ?validateSubtaskPlan(args.subtasks,{readScope,writeScope,workspaceRoot:config.workspace_root})
     :null;
-   const forceReplace=args.replace_active===true||(zeroCeremony&&args.replace_active!==false);
+   const replaceActive=args.replace_active===true;
    for(const existing of inbox.list()){
-    if(existing.state==='VERIFIED'||existing.outcome==='RELEASED'||existing.outcome==='FAILED')continue;
-    if(existing.outcome==='CANCELLED'&&['PENDING','CLAIMED'].includes(existing.state))continue;
-    const ageMs=now()-Date.parse(existing.job.created_at);
-    if(forceReplace||ageMs>MAX_JOB_AGE_MS){
-     try{inbox.release(existing.job.task_id,forceReplace?'Auto-released previous task on new submit_job':'Auto-released expired task (>10m)');}catch{}
+    if(existing.state==='PENDING'&&existing.outcome===null){
+     const ageMs=now()-Date.parse(existing.job.created_at);
+     if(replaceActive||ageMs>MAX_JOB_AGE_MS){
+      try{inbox.release(existing.job.task_id,replaceActive?'Auto-released previous pending task on replace_active':'Auto-released expired pending task (>10m)');}catch{}
+     }
     }
    }
    const job=makeJob(config.binding,{
@@ -318,8 +320,10 @@ export function createLiveToolHandler({
     readiness_status:readiness.readiness_status,
     reason_codes:readiness.reason_codes,
     next_step:targetConversationId
-     ?(readiness.ready_to_dispatch?'Call wait_job({ workspace_root, auto_verify: true }) to await Antigravity GUI completion and read concise_summary.':'Enable "AWO Desktop Bridge" in Antigravity Automations Dashboard (or paste single_line_trigger into GUI), then call wait_job.')
-     :'Open a chat in Antigravity Desktop GUI for this workspace so the Hook Beacon captures conversationId, then Sidecar will auto-deliver.'
+     ?(readiness.ready_to_dispatch
+      ?'Call wait_job({ workspace_root, task_id, auto_verify: true }) to await completion and mechanical check, then inspect changes and call verify_job.'
+      :'Enable "AWO Desktop Bridge" in Antigravity Automations Dashboard (or paste single_line_trigger into GUI), then call wait_job.')
+     :`Target receiver is unclear/missing (${readiness.reason_codes.join(', ')||'TARGET_MISSING'}); job is held safely in PENDING without sending to an unverified chat.`
    };
   }
 
@@ -340,17 +344,15 @@ export function createLiveToolHandler({
   }
 
   if(name==='get_job_result'){
-   let record=collectWorkerReport(inbox,taskId);
+   const record=collectWorkerReport(inbox,taskId);
+   const formatted=attachWorkerReport(inbox,record,formatRecord(inbox,record));
    if(args.auto_verify&&record.state==='RESULT_READY'&&!['CANCELLED','RELEASED'].includes(record.outcome)){
-    try{
-     record=await verifyJob(inbox,taskId,{
-      checks:config.checks,
-      snapshot:captureWorkspaceFast,
-      review:async()=>({accepted:true,notes:['Auto-verified on get_job_result']})
-     });
-    }catch{}
+    const autoVerification=await runMechanicalVerification(inbox,taskId,{
+     checks:config.checks
+    });
+    formatted.auto_verification=autoVerification;
    }
-   return attachWorkerReport(inbox,record,formatRecord(inbox,record));
+   return formatted;
   }
 
   if(name==='wait_job'){
@@ -364,18 +366,16 @@ export function createLiveToolHandler({
      watcher.on('error',()=>{});
     }
     while(true){
-     let record=collectWorkerReport(inbox,taskId);
+     const record=collectWorkerReport(inbox,taskId);
      if(['RESULT_READY','VERIFIED'].includes(record.state)||record.outcome!==null){
+      const formatted=attachWorkerReport(inbox,record,formatRecord(inbox,record));
       if(args.auto_verify&&record.state==='RESULT_READY'&&!['CANCELLED','RELEASED'].includes(record.outcome)){
-       try{
-        record=await verifyJob(inbox,taskId,{
-         checks:config.checks,
-         snapshot:captureWorkspaceFast,
-         review:async()=>({accepted:true,notes:['Auto-verified on wait_job completion']})
-        });
-       }catch{}
+       const autoVerification=await runMechanicalVerification(inbox,taskId,{
+        checks:config.checks
+       });
+       formatted.auto_verification=autoVerification;
       }
-      return {timed_out:false,...attachWorkerReport(inbox,record,formatRecord(inbox,record))};
+      return {timed_out:false,...formatted};
      }
      const remaining=deadline-Date.now();
      if(remaining<=0){
@@ -405,7 +405,6 @@ export function createLiveToolHandler({
    if(args.select_receiver&&(current.delivery?.kind!=='ANTIGRAVITY_AGENTAPI'||current.delivery?.started!==true||current.delivery?.exit_code!==0))throw Error('Select a recipient only from a real successful automatic delivery');
    const verified=await verifyJob(inbox,taskId,{
     checks:config.checks,
-    snapshot:captureWorkspaceFast,
     review:async()=>({accepted:true,notes:args.review_notes??[]})
    });
    if(args.select_receiver)selectVerifiedReceiver(verified,{stateDirectory:checkedState,now});

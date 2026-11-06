@@ -3,31 +3,28 @@ name: antigravity-orchestrator
 description: Coordinate substantive coding, web/app development and debugging in the CURRENT Codex workspace with Antigravity Desktop. Choose DIRECT for small tasks, native review when useful, or bounded scoped Antigravity jobs; keep collaborating through implementation and verification.
 ---
 
-# Codex Boss → Antigravity Desktop (Fast Zero-ID & Token-Saving Workflow)
+# Codex Boss → Antigravity Desktop (Global Workflow)
 
-The user already opens Antigravity Desktop GUI and selects the conversation, workspace, model, and reasoning level themselves. Never ask the user for `conversation_id`, `task_id`, model settings, or per-project setup.
+Installed once at user scope. New projects require no local bridge setup, hooks, skills, or UUID input. Never assign or change Antigravity model/reasoning settings, and never switch accounts or alter login mechanisms.
 
-## 1. Fast 2-Step Loop (Divide → Submit → Read Summary Only)
+## 1. Decision & Decomposition
+- **DIRECT for small work**: Handle small or localized edits directly without bridge or subagent overhead.
+- **Native subagents / Antigravity jobs**: Delegate only when there are genuinely independent parts and real execution benefit. Do **not** spawn subagents merely because a task touches two files or two modules.
+- **One active write job per workspace**: Keep at most one active job per workspace while allowing other workspaces to run independently. Do **not** auto-release a running (`CLAIMED`/`DISPATCHED`) or `UNCERTAIN_DELIVERY` job just because a new prompt arrives.
+- **Controlled write scope**: Never default `write_scope` to the entire workspace for a short prompt. Infer only the specific files needed from the request and actual workspace source, expanding in a controlled manner if the task requires it.
 
-1. **Tự động Chia việc & Gửi thẳng vào khung chat đang mở (`submit_job`)**:
-   - Không bao giờ chờ người dùng nhắc "hãy chia việc" hay "hãy dùng subagent":
-     - Việc cực nhỏ 1–2 dòng: tự sửa **DIRECT** ngay.
-     - Việc vừa/lớn hoặc từ >= 2 phần độc lập: **tự động tách thành `subtasks` theo từng wave (`wave: 1..8`)** với `write_scope` tách biệt (disjoint) và gọi `submit_job` ngay (không cần gọi `bridge_status` trước):
-       - `workspace_root`: đường dẫn workspace hiện tại (bắt buộc).
-       - `request`: mục tiêu tổng thể rõ ràng.
-       - `replace_active: true`: tự động giải phóng job cũ bị kẹt để không bao giờ bị chặn.
-       - `subtasks`: mảng các phần việc độc lập để Antigravity tự động spawn subagent song song.
-       - `read_scope`, `write_scope`, `acceptance_criteria` là tùy chọn (`writeJobBrief` sẽ tự động đính kèm **Surgical Symbol & Line Map** `L<line>:<symbol>` cho Worker).
-   - Live Sidecar tự động điền prompt vào khung chat Antigravity đang mở sẵn và bấm Submit.
+## 2. Brief, Waiting & Independent Parent Verification
+1. **Submit (`submit_job`)**:
+   - Pass `workspace_root` from the current session environment on every call (never use server cwd, another project, or the bridge repo).
+   - Keep briefs compact: include only goal, relevant paths, dependencies (`subtasks` waves when independent parallel work is beneficial), `read_scope`, `write_scope` (`[]` if read-only), `acceptance_criteria`, and registered `verification_commands`. Never re-send full source files, full chat history, or large logs already saved in the workspace.
+   - Routing uses a fresh matching-workspace Hook Beacon or an explicitly verified persistent receiver (`select_receiver: true`). A new hook alone never switches a verified receiver; if the target is ambiguous or missing, hold the job and report concisely rather than sending to an unverified chat. Never automatically retry `UNCERTAIN_DELIVERY`.
+2. **Wait & Mechanical Check (`wait_job`)**:
+   - Call `wait_job({ workspace_root, task_id, auto_verify: true })` (or check periodically on long jobs while doing useful parent work).
+   - `auto_verify: true` performs **mechanical checks only** (task identity, scope, hashes, actual diff, syntax, registered checks) and leaves the job in `RESULT_READY`. It never replaces independent parent review.
+3. **Parent Review & Close (`verify_job`)**:
+   - Inspect `concise_summary`, meaningful source diffs, and `acceptance_criteria`. Run fresh checks proportional to risk without repeating redundant test suites needlessly.
+   - Transition to `VERIFIED` only by calling `verify_job({ workspace_root, task_id, accepted: true, review_notes: [...] })` after verifying the changes and acceptance criteria (or `accepted: false` to reject/rework).
 
-2. **Chờ kết quả & Chỉ đọc Summary tiết kiệm token (`wait_job`)**:
-   - Call `wait_job({ workspace_root, auto_verify: true })` (omit `task_id` — it automatically tracks the latest job and auto-verifies on completion).
-   - When `wait_job` returns, read **ONLY `concise_summary`** (`headline`, `findings`, `changed_files`, `tests`, `errors`).
-   - **Zero-Read-Back Rule**: Do **NOT** re-read modified files from start to finish or re-run the entire test suite after a clean `concise_summary` (`status: "reported"`, `errors: []`). Inspect specific source lines only if `concise_summary` reports a blocker, error, or ambiguity.
-
-## 2. Surgical Context & Terminal Discipline (Boss Direct Work)
-- **Map-First Range Reads**: When inspecting files yourself, locate symbols via `rg -n` or `node "<bridge_root>/src/desktop-inbox/codebase-map.mjs" "<workspace>" [scope]` and read only `StartLine..EndLine` (±30 lines) instead of full files.
-- **Output Capping (`rtk` pattern)**: Run targeted test files rather than full suites during iteration, and cap noisy shell output (`| Select-Object -First 40` / `-Last 40`) to prevent context bloat.
-- **Minimal Diff**: Edit only the lines needed; avoid boilerplate wrappers or unrequested refactoring.
-
-
+## 3. Context & Terminal Discipline
+- Locate symbols with `rg -n` or `codebase-map.mjs` and read relevant ranges, expanding context freely whenever needed (never enforce a rigid `±30` line cap when more context is required).
+- Keep full logs in files and cap noisy shell output (`| Select-Object -First 40`) while preserving exit codes and critical error details.

@@ -3,7 +3,6 @@ import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {DEFAULT_LIVE_STATE,writeActiveTarget} from './live-bridge.mjs';
 import {canonicalWorkspace} from './contracts.mjs';
-import {refreshSelectedReceiverOnBeacon} from './selected-receiver.mjs';
 
 function extractWorkspaces(payload){
  const candidates=[];
@@ -37,7 +36,6 @@ export function processBeaconInput(payload,{eventName='SessionStart',stateDirect
   const res=writeActiveTarget(ws,{conversationId,eventName:event,modelName,workspacePaths:workspaces,eventTimestamp,stateDirectory,now});
   updated.push({workspace_root:ws,conversation_id:res.target.conversation_id,path:res.path});
  }
- refreshSelectedReceiverOnBeacon(conversationId,{stateDirectory,eventTimestamp,now});
  return {updated,skipped:updated.length?null:'no_valid_workspace'};
 }
 
@@ -70,7 +68,6 @@ export async function main(args=process.argv.slice(2)){
  }
  if(seedWorkspace&&seedConversation){
   const res=writeActiveTarget(seedWorkspace,{conversationId:seedConversation,eventName,modelName:seedModel,stateDirectory});
-  refreshSelectedReceiverOnBeacon(seedConversation,{stateDirectory});
   process.stdout.write(JSON.stringify({ok:true,target:res.target,path:res.path})+'\n');
   return;
  }

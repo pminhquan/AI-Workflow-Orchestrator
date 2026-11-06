@@ -33,14 +33,13 @@ The live App-owned bridge is installed once at user scope by `scripts/install-gl
 
 ## Antigravity Autonomous Execution (Auto-Divide, Auto-Subagent & Surgical Mode)
 
-Khi nhận bất kỳ yêu cầu nào từ người dùng hoặc từ `[Codex Boss Job ...]`, Antigravity **tự động phân tích, chia việc và điều phối subagent ngay trong lượt đầu tiên mà không cần người dùng nhắc**:
+Khi nhận yêu cầu từ người dùng hoặc từ `[Codex Boss Job ...]`, Antigravity tự đánh giá và chọn chế độ thực thi phù hợp:
 
-- **Tự động quyết định chế độ thực thi (Auto-Tiering)**:
-  1. **DIRECT (Việc nhỏ / 1 file / sửa cục bộ)**: Tự thực hiện ngay lập tức, không tạo subagent.
-  2. **AUTO-RESEARCH (Khảo sát ≥ 2 vùng mã nguồn/tài liệu độc lập)**: Tự động gọi song song các `invoke_subagent` (`TypeName: "research"`) trong cùng một lượt, sau đó dừng lượt chờ kết quả trả về (reactive wakeup, không poll).
-  3. **AUTO-TEAM / PARALLEL SUBAGENTS (Nhiệm vụ có ≥ 2 phần việc hoặc ≥ 2 file/module sửa độc lập)**: Tự động đóng vai **Team Lead** ngay cả khi prompt chưa chia sẵn subtask — tách các phần việc theo `write_scope` không trùng nhau (disjoint), gọi song song các `invoke_subagent` (`TypeName: "self"`, `Workspace: "inherit"`) kèm phạm vi file và dòng lệnh cụ thể, chờ các subagent hoàn tất rồi tích hợp và kiểm tra.
-- **Đọc/Sửa Phẫu Thuật & Tiết Kiệm Token (Always-On)**:
-  - Tra cứu vị trí hàm/class bằng `src/desktop-inbox/codebase-map.mjs` (hoặc mục Surgical Map trong brief / `rg -n`) trước khi đọc; chỉ gọi `read_file` theo khoảng `StartLine..EndLine` (±30 dòng quanh vị trí cần sửa), tuyệt đối không đọc tràn cả file dài từ đầu tới cuối.
-  - Chỉ sửa đúng những dòng cần thiết (Minimal Diff, không viết thừa boilerplate/wrapper), chỉ chạy đúng file test liên quan và cắt gọn log terminal dài (`| Select-Object -First 40`).
-  - Khi hoàn tất job từ Codex Boss, chạy `node "src/desktop-inbox/report-cli.mjs" --latest --run-checks --summary "<tóm tắt súc tích>"` để Codex chỉ đọc Summary mà không phải đọc lại toàn bộ code.
+- **Quyết định chế độ thực thi (Right-Sized Tiering)**:
+  1. **DIRECT (Việc nhỏ / cục bộ)**: Tự thực hiện trực tiếp ngay lập tức, không tạo subagent.
+  2. **PARALLEL SUBAGENTS (Chỉ khi có các phần việc độc lập và lợi ích thực tế)**: Không spawn subagent chỉ vì có hai file hoặc hai module. Khi thực sự có các nhánh khảo sát độc lập (`TypeName: "research"`) hoặc các phần việc sửa code độc lập có lợi ích song song (`TypeName: "self"`, `Workspace: "inherit"`), tách theo `write_scope` không trùng nhau (disjoint, không xung đột read/write cùng wave, không nested teams) và chờ reactive wakeup. Không tự gán model/reasoning level hoặc tự chuyển tài khoản/đăng nhập.
+- **Đọc/Sửa & Tiết Kiệm Token**:
+  - Tra cứu vị trí symbol (`rg -n` hoặc `src/desktop-inbox/codebase-map.mjs`) và đọc khoảng dòng cần thiết, mở rộng phạm vi đọc bất cứ khi nào cần thêm context (không bắt buộc bó cứng `±30` dòng).
+  - Chỉ sửa những dòng cần thiết (Minimal Diff), chạy focused tests liên quan (không lặp test vô ích), lưu full logs trong file và giữ summary ngắn gọn nhưng đầy đủ exit code cùng thông tin lỗi quan trọng.
+  - Khi hoàn tất job từ Codex Boss, chạy `node "src/desktop-inbox/report-cli.mjs" --brief "<đường_dẫn_brief.json>" --run-checks --summary "<tóm tắt súc tích>"` gắn đúng `workspace_root`, `task_id` và `attempt_id` để Codex kiểm tra diff/acceptance và `verify_job`.
 

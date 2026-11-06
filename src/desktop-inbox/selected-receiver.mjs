@@ -1,7 +1,7 @@
 import {existsSync} from 'node:fs';
 import {ROOT,scopedPath,sha256} from '../core/util.mjs';
 import {UUID} from './contracts.mjs';
-import {DEFAULT_LIVE_STATE,checkedStateDirectory,atomicWriteJSON,readBoundedJSON} from './live-bridge.mjs';
+import {DEFAULT_LIVE_STATE,checkedStateDirectory,atomicWriteJSON,readBoundedJSON,findTaskAcrossWorkspaces} from './live-bridge.mjs';
 
 const ID=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 function selectionPath(stateDirectory){return scopedPath(ROOT,`${checkedStateDirectory(stateDirectory)}/selected-receiver.json`);}
@@ -19,19 +19,24 @@ export function readSelectedReceiver({stateDirectory=DEFAULT_LIVE_STATE}={}){
  if(!existsSync(path))return null;
  const selected=readBoundedJSON(path,4096);
  try{assertSelectionProof(selected);}catch{throw Error('SELECTED_RECEIVER_INVALID: inspect the saved recipient choice');}
- return selected;
-}
-
-export function resolveEffectiveReceiver(readiness,selected){
- if(!selected)return null;
- if(readiness?.target_observation?.bound&&readiness?.target_observation?.fresh&&readiness?.active_gui_target?.conversation_id){
-  const activeMs=Date.parse(readiness.active_gui_target.updated_at);
-  const selectedMs=Date.parse(selected.selected_at);
-  if(Number.isFinite(activeMs)&&Number.isFinite(selectedMs)&&activeMs>selectedMs){
-   return null;
+ let found=null;
+ try{
+  found=findTaskAcrossWorkspaces(selected.verified_task_id,{stateDirectory});
+ }catch(err){
+  if(!String(err?.message||'').startsWith('Task not found'))throw Error('SELECTED_RECEIVER_INVALID: inspect the saved recipient choice');
+ }
+ if(!found)throw Error('SELECTED_RECEIVER_INVALID: verified receipt is missing');
+ if(found){
+  const record=found.record;
+  if(record.state!=='VERIFIED'||record.outcome!==null||record.host_receipt?.accepted!==true||record.job.attempt_id!==selected.verified_attempt_id||record.delivery?.kind!=='ANTIGRAVITY_AGENTAPI'||record.delivery.exit_code!==0||record.delivery.started!==true||record.delivery?.target_conversation_id!==selected.conversation_id||sha256(record.host_receipt)!==selected.host_receipt_sha256){
+   throw Error('SELECTED_RECEIVER_INVALID: inspect the saved recipient choice');
   }
  }
  return selected;
+}
+
+export function resolveEffectiveReceiver(_readiness,selected){
+ return selected??null;
 }
 
 export function selectedReadiness(readiness,selected){
@@ -39,24 +44,6 @@ export function selectedReadiness(readiness,selected){
  if(!effective)return readiness;
  const reason_codes=readiness.reason_codes.filter(code=>!code.startsWith('TARGET_'));
  return {...readiness,reason_codes,ready_to_dispatch:reason_codes.length===0,readiness_status:reason_codes.length?'NOT_READY':'READY_TO_DISPATCH',delivery_target:{mode:'user_selected_receiver',conversation_id:effective.conversation_id,selected_at:effective.selected_at,verified_task_id:effective.verified_task_id,proves_gui_focus:false,workspace_match_required:false}};
-}
-
-export function refreshSelectedReceiverOnBeacon(conversationId,{stateDirectory=DEFAULT_LIVE_STATE,eventTimestamp=null,now=Date.now}={}){
- if(typeof conversationId!=='string'||!ID.test(conversationId.trim()))return null;
- const path=selectionPath(stateDirectory);
- if(!existsSync(path))return null;
- try{
-  const current=readBoundedJSON(path,4096);
-  assertSelectionProof(current);
-  const nextIso=typeof eventTimestamp==='string'&&Number.isFinite(Date.parse(eventTimestamp))?new Date(Date.parse(eventTimestamp)).toISOString():new Date(now()).toISOString();
-  if(Date.parse(nextIso)<Date.parse(current.selected_at))return current;
-  const updated={...current,conversation_id:conversationId.trim(),selected_at:nextIso};
-  assertSelectionProof(updated);
-  atomicWriteJSON(path,updated);
-  return updated;
- }catch{
-  return null;
- }
 }
 
 function routePath(inbox,job){return scopedPath(inbox.root,`delivery-targets/${job.task_id}-${job.attempt_id}.json`);}

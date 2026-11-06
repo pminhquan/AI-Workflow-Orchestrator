@@ -3,28 +3,27 @@ name: codex-worker
 description: Execute bounded jobs dispatched by Codex Boss into Antigravity Desktop ("[Codex Boss Job ...]") as the Antigravity Team Lead, staying inside the brief's scope and reporting honestly through report-cli.mjs.
 ---
 
-# Codex Worker — Antigravity Team Lead (Surgical & Fast Summary Mode)
+# Codex Worker — Antigravity Team Lead
 
-Activate automatically on any message starting with `[Codex Boss Job ...]` or when the user says `"chạy job"` (read `state/desktop-inbox-live/LATEST-JOB.md`).
+Installed once at user scope. Activate on any message starting with `[Codex Boss Job ...]` or referencing a `brief-<attempt_id>.md`. Never change model/reasoning settings or account/login state.
 
-## 1. Tự động Chia việc & Gọi Subagent (Auto-Decomposition — Không đợi người dùng nhắc)
-- Ngay khi nhận yêu cầu (từ người dùng hoặc từ `[Codex Boss Job ...]`), **tự động đánh giá độ phức tạp và điều phối ngay ở lượt đầu tiên**:
-  1. **Direct (1 file / sửa nhỏ cục bộ)**: Tự thực hiện trực tiếp ngay lập tức, không tạo subagent.
-  2. **Auto-Research (Khảo sát >= 2 vùng mã nguồn/tài liệu độc lập)**: Tự động gọi song song các `invoke_subagent({ TypeName: "research", Role: "...", Prompt: "..." })` trong cùng 1 lượt, dừng lượt chờ hệ thống đánh thức (reactive wakeup).
-  3. **Auto-Team / Parallel Subagents (Nhiệm vụ có >= 2 phần việc hoặc >= 2 file/module sửa độc lập)**: Ngay cả khi brief chưa chia sẵn `subtasks`, tự động đóng vai **Team Lead** — tách các phần việc theo `write_scope` không trùng nhau (disjoint) và gọi song song các `invoke_subagent({ TypeName: "self", Workspace: "inherit", Role: "...", Prompt: "..." })` theo từng wave. Không bao giờ chờ người dùng nhắc mới gọi subagent.
+## 1. Target Binding & Scope Discipline
+- Read the explicit brief path from the trigger. Its `workspace_root`, `task_id`, and `attempt_id` define the exact work target; never infer the project from the receiving chat, cwd, or a global latest file across projects.
+- Stay strictly within `read_scope` and `write_scope` (`write_scope: []` is read-only). Preserve concurrent edits, never touch `.codex/` or `.gemini/`, and never commit/push unless explicitly requested.
 
-## 2. Đọc & Sửa Phẫu Thuật (Surgical Read/Edit — Tiết kiệm Token & Thời gian)
-- **Dùng Surgical Map trước khi đọc file**: Xem mục `## 2.5. Bản đồ Symbol & Dòng lệnh (Surgical Map)` ngay trong brief (`L<line>:<symbol>`) để biết chính xác vị trí hàm/class, sau đó gọi `read_file` chỉ với `StartLine..EndLine` (±30 dòng quanh hàm cần sửa). **Không đọc cả file dài từ đầu tới cuối**.
-- **Minimal Diff (Tiết kiệm Code)**: Chỉ sửa đúng những dòng giải quyết yêu cầu trong `write_scope`; giữ nguyên thay đổi đồng thời không liên quan, không viết thừa wrapper/comment/boilerplate.
-- **Giới hạn Output Terminal (`rtk` pattern)**: Chỉ chạy file test liên quan trực tiếp (`node --check`, `node --test <file>`), cắt gọn log dài (`| Select-Object -First 40` / `-Last 40`) để không làm tràn context.
+## 2. Execution & Subagent Discipline
+- **DIRECT for small work**: Handle localized edits or single-flow tasks directly without spawning subagents.
+- **Spawn subagents only when independent parts provide real benefit**:
+  - Do **not** spawn subagents merely because a task involves two files or two modules.
+  - When the brief defines `subtasks` waves or has genuinely independent research/implementation slices with real parallel benefit, partition by disjoint `write_scope` (no same-wave read/write or write/write overlap, no nested teams), invoke subagents in parallel, and wait via reactive wakeup without polling.
+- **Context & Testing**:
+  - Locate symbols quickly and read targeted line ranges, but read wider sections or full files whenever additional context is needed (no rigid `±30` line restriction).
+  - Apply minimal diffs without boilerplate. Run focused checks (`node --check`, targeted test files) without repeating full suites unnecessarily.
 
-## 3. Ghi Summary ngắn gọn cho Codex Boss (Zero-Read-Back)
-- Khi hoàn tất, chạy **1 lệnh duy nhất** (không cần truyền ID):
+## 3. Bound Concise Reporting (`report-cli.mjs`)
+- When finished, run the explicit brief-bound command from the brief:
   ```powershell
-  node "<đường_dẫn_report-cli.mjs>" --latest --run-checks --summary "<tóm tắt súc tích: đã sửa file nào, logic gì, kết quả test>"
+  node "<report-cli.mjs>" --brief "<brief-attempt.json>" --run-checks --summary "<concise summary of changes and test outcomes>"
   ```
-- Viết `--summary` rõ ràng, đầy đủ ý chính để **Codex Boss chỉ cần đọc Summary là nắm được toàn bộ kết quả mà không cần mở lại code từ đầu tới cuối**.
-- Nếu bị chặn, dùng `--status blocked --blocker "<lý do>"`; nếu lỗi, dùng `--status failed --error "<chi tiết>"`.
-- Phản hồi ngắn gọn trên khung chat sau khi nộp report.
-
-
+- Keep reports compact: include only `changed_files`, `summary`/`findings`, `tests` (with exit codes and key error details), `errors`/`blockers`, and `evidence`. Full check logs are saved to file in the task output directory; never dump full source files or huge raw logs into the report or chat.
+- Use `--status blocked --blocker "<reason>"` or `--status failed --error "<detail>"` when blocked or failed. Never declare `VERIFIED` (Codex parent verifies independently).

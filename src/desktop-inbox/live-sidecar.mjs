@@ -171,6 +171,7 @@ export async function runLiveSidecarTick({
  let activeTargets=0;
  for(const ws of workspaces){
   if(signal?.aborted)break;
+  try{
   const target=readActiveTarget(ws,{stateDirectory:checkedState});
   if(target?.conversation_id)activeTargets++;
   const {inbox,config}=existingLiveInbox(ws,{stateDirectory:checkedState,now});
@@ -186,12 +187,6 @@ export async function runLiveSidecarTick({
      }
     }catch(error){
      actions.push({workspace_root:ws,task_id:rec.job.task_id,action:'REPORT_ERROR',error:error.message});
-    }
-    if(rec.outcome==='UNCERTAIN_DELIVERY'&&now()-Date.parse(rec.job.created_at)>MAX_JOB_AGE_MS){
-     try{
-      inbox.release(rec.job.task_id,'Auto-released expired uncertain delivery (>10m)');
-      actions.push({workspace_root:ws,task_id:rec.job.task_id,action:'EXPIRED_UNCERTAIN_RELEASED'});
-     }catch{}
     }
    }
   }
@@ -235,16 +230,6 @@ export async function runLiveSidecarTick({
   }catch{
    call={started:true,spawn_error:'UNKNOWN',exit_code:null,exit_signal:null,timed_out:false,output_overflow:false,stdout_sha256:sha256(''),stderr_sha256:sha256(''),stdout_bytes:0,stderr_bytes:0};
   }
-  const fallbackConvId=readiness.active_gui_target?.conversation_id;
-  if(call.exit_code!==0&&fallbackConvId&&fallbackConvId!==conversationId&&readiness.target_observation?.bound&&readiness.target_observation?.fresh){
-   try{
-    const retryCall=await invokeAgentapi(['send-message',fallbackConvId,trigger],{timeoutMs:transportTimeoutMs,signal,cwd:inbox.root,env});
-    if(retryCall.exit_code===0&&!retryCall.timed_out&&!retryCall.spawn_error){
-     call=retryCall;
-     conversationId=fallbackConvId;
-    }
-   }catch{}
-  }
   const dispatchLatencyMs=Math.max(0,now()-Date.parse(pending.job.created_at));
   const receipt={
    kind:'ANTIGRAVITY_AGENTAPI',
@@ -264,6 +249,9 @@ export async function runLiveSidecarTick({
   }else{
    inbox.fail(claimed.job.task_id,claimed.claim_id,'agentapi returned non-zero or timed out',{uncertain:true});
    actions.push({workspace_root:ws,task_id:claimed.job.task_id,action:'UNCERTAIN_DELIVERY',exit_code:call.exit_code});
+  }
+  }catch(error){
+   actions.push({workspace_root:ws,action:'WORKSPACE_ERROR',error:String(error.message).slice(0,240)});
   }
  }
  const transportInfo=inspectAgentapiEnv(env);

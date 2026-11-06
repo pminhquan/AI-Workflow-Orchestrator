@@ -1,12 +1,12 @@
-import {existsSync,lstatSync} from 'node:fs';
+import {existsSync,lstatSync,mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {ROOT,scopedPath,sha256} from '../core/util.mjs';
 import {CheckRunner,changedFiles,verifyScope} from '../verification/checks.mjs';
-import {validateReport} from './contracts.mjs';
+import {sameWorkspace,validateReport} from './contracts.mjs';
 import {readBoundedBytes} from './verification.mjs';
 import {captureWorkspaceFast} from './fast-snapshot.mjs';
-import {DEFAULT_LIVE_STATE,atomicWriteJSON,atomicWriteText,checkedStateDirectory,collectWorkerReport,existingLiveInbox,latestBriefPaths,openLiveInbox,readBoundedJSON,resolveWorkspaceConfig} from './live-bridge.mjs';
+import {DEFAULT_LIVE_STATE,atomicWriteJSON,atomicWriteText,checkedStateDirectory,collectWorkerReport,existingLiveInbox,findTaskAcrossWorkspaces,jobPaths,latestBriefPaths,openLiveInbox,readBoundedJSON,resolveLatestWorkspaceTask,resolveWorkspaceConfig} from './live-bridge.mjs';
 
 function splitList(values){
  const out=[];
@@ -61,28 +61,47 @@ function autoEvidence(job,inspectedFiles,actualChanged){
  return items;
 }
 
-export function resolveBriefInput({briefPath=null,workspaceRoot=null,stateDirectory=DEFAULT_LIVE_STATE}={}){
+export function resolveBriefInput({briefPath=null,workspaceRoot=null,taskId=null,attemptId=null,stateDirectory=DEFAULT_LIVE_STATE}={}){
  if(briefPath)return resolve(briefPath);
  const checked=checkedStateDirectory(stateDirectory);
  if(workspaceRoot){
-  const opened=existingLiveInbox(workspaceRoot,{stateDirectory:checked});
-  if(opened.inbox){
-   const wsLatest=scopedPath(opened.inbox.root,'latest-brief.json');
-   if(existsSync(wsLatest))return wsLatest;
+  if(taskId){
+   const opened=existingLiveInbox(workspaceRoot,{stateDirectory:checked});
+   if(!opened.inbox)throw Error('Task not found (workspace inbox not initialized): '+taskId);
+   const record=opened.inbox.get(taskId);
+   return jobPaths(opened.inbox,record.job).brief_json_path;
   }
+  const latest=resolveLatestWorkspaceTask(workspaceRoot,{stateDirectory:checked});
+  const taskBriefPath=jobPaths(latest.inbox,latest.record.job).brief_json_path;
+  if(existsSync(taskBriefPath))return taskBriefPath;
+  const wsLatest=scopedPath(latest.inbox.root,'latest-brief.json');
+  if(existsSync(wsLatest)){
+   try{
+    const parsed=readBoundedJSON(wsLatest,65536);
+    if(parsed?.job?.task_id===latest.record.job.task_id)return wsLatest;
+   }catch{}
+  }
+  return taskBriefPath;
  }
- const globalLatest=scopedPath(ROOT,`${checked}/latest-brief.json`);
- if(existsSync(globalLatest))return globalLatest;
- throw Error('Missing brief: pass --brief <brief.json> or submit a job first so latest-brief.json exists');
+ if(taskId){
+  const found=findTaskAcrossWorkspaces(taskId,{stateDirectory:checked});
+  return jobPaths(found.inbox,found.record.job).brief_json_path;
+ }
+ throw Error('Missing brief or workspace binding: pass --brief <brief.json> or --workspace <workspace_root> [--task-id <id>]');
 }
 
-export function submitWorkerReport({briefPath=null,workspaceRoot=null,status='reported',summary='',inspected=[],changed=null,findings=[],evidence=[],blockers=[],errors=[],tests=[],stateDirectory=DEFAULT_LIVE_STATE,now=Date.now}={}){
- const resolvedBriefPath=resolveBriefInput({briefPath,workspaceRoot,stateDirectory});
+export function submitWorkerReport({briefPath=null,workspaceRoot=null,taskId=null,attemptId=null,status='reported',summary='',inspected=[],changed=null,findings=[],evidence=[],blockers=[],errors=[],tests=[],stateDirectory=DEFAULT_LIVE_STATE,now=Date.now}={}){
+ const resolvedBriefPath=resolveBriefInput({briefPath,workspaceRoot,taskId,attemptId,stateDirectory});
  const brief=readBoundedJSON(resolvedBriefPath,65536);
  if(brief?.format!=='desktop-inbox.brief@1'||!brief?.job?.task_id)throw Error('Invalid brief JSON format');
  const job=brief.job;
+ if(workspaceRoot&&!sameWorkspace(job.workspace_root,workspaceRoot))throw Error('Workspace mismatch between report argument and brief');
+ if(taskId&&job.task_id!==taskId)throw Error('Task ID mismatch between report argument and brief');
+ if(attemptId&&job.attempt_id!==attemptId)throw Error('Attempt ID mismatch between report argument and brief');
  const {inbox}=openLiveInbox(job.workspace_root,{stateDirectory,now});
  let record=inbox.get(job.task_id);
+ if(record.job.attempt_id!==job.attempt_id)throw Error('Stale brief attempt_id does not match active inbox record');
+ assertBriefBinding(brief,record,inbox);
  if(record.state==='PENDING'&&record.outcome===null){
   const claimed=inbox.claim(job.task_id);
   inbox.beginDispatch(job.task_id,claimed.claim_id);
@@ -150,7 +169,6 @@ export function submitWorkerReport({briefPath=null,workspaceRoot=null,status='re
  atomicWriteText(brief.paths.result_path,resultMd);
  const latestPaths=latestBriefPaths(inbox,stateDirectory);
  atomicWriteText(latestPaths.latest_summary_md_path,resultMd);
- try{atomicWriteText(latestPaths.global_latest_summary_md_path,resultMd);}catch{}
  atomicWriteJSON(brief.paths.report_path,validated);
  if(!existsSync(brief.paths.collected_report_path)){
   atomicWriteJSON(brief.paths.collected_report_path,validated,{exclusive:true});
@@ -170,16 +188,48 @@ export function submitWorkerReport({briefPath=null,workspaceRoot=null,status='re
  };
 }
 
-export async function runPreReportChecks(briefPath=null,{workspaceRoot=null,stateDirectory=DEFAULT_LIVE_STATE}={}){
- const resolvedBriefPath=resolveBriefInput({briefPath,workspaceRoot,stateDirectory});
+function summarizeCheckOutput(r){
+ const raw=String(r.output??'').trim();
+ if(!raw)return r.passed?'ok':'failed';
+ const lines=raw.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+ if(!r.passed&&lines.length>1){
+  const errLines=lines.filter(l=>/error|fail|assert|exception|not ok|ERR_|TypeError|SyntaxError|ReferenceError/i.test(l));
+  const chosen=errLines.length?errLines:lines.slice(-3);
+  return chosen.join(' | ').slice(0,240);
+ }
+ return lines.join(' ').slice(0,240);
+}
+
+function assertBriefBinding(brief,record,inbox){
+ if(sha256(brief.job)!==sha256(record.job))throw Error('Brief job does not match immutable inbox binding');
+ const expected=jobPaths(inbox,record.job);
+ for(const key of ['output_directory','result_path','report_path','collected_report_path']){
+  if(brief.paths?.[key]!==expected[key])throw Error('Brief output path does not match inbox binding: '+key);
+ }
+}
+
+export async function runPreReportChecks(briefPath=null,{workspaceRoot=null,taskId=null,attemptId=null,stateDirectory=DEFAULT_LIVE_STATE}={}){
+ const resolvedBriefPath=resolveBriefInput({briefPath,workspaceRoot,taskId,attemptId,stateDirectory});
  const brief=readBoundedJSON(resolvedBriefPath,65536);
  if(brief?.format!=='desktop-inbox.brief@1'||!brief?.job)throw Error('Invalid brief JSON format');
+ if(workspaceRoot&&!sameWorkspace(brief.job.workspace_root,workspaceRoot))throw Error('Workspace mismatch between report argument and brief');
+ if(taskId&&brief.job.task_id!==taskId)throw Error('Task ID mismatch between report argument and brief');
+ if(attemptId&&brief.job.attempt_id!==attemptId)throw Error('Attempt ID mismatch between report argument and brief');
+ const {inbox}=openLiveInbox(brief.job.workspace_root,{stateDirectory});
+ assertBriefBinding(brief,inbox.get(brief.job.task_id),inbox);
  const config=resolveWorkspaceConfig(brief.job.workspace_root,{stateDirectory});
  const runner=new CheckRunner(config.checks);
  const commands=Array.isArray(brief.job.verification_commands)?brief.job.verification_commands:[];
  const receipts=await Promise.all(commands.map(id=>runner.run(brief.job.workspace_root,id)));
+ const checksLogPath=brief.paths?.output_directory?resolve(brief.paths.output_directory,'checks.log'):null;
+ if(checksLogPath){
+  mkdirSync(brief.paths.output_directory,{recursive:true});
+  const logText=receipts.map(r=>`=== check:${r.check_id} (exit ${r.exit_code??1}, passed=${r.passed}, ${r.execution_ms}ms) ===\n${String(r.output??'').trim()}\n`).join('\n');
+  atomicWriteText(checksLogPath,logText);
+ }
  return {
   all_passed:receipts.every(r=>r.passed),
+  checks_log_path:checksLogPath,
   checks:receipts.map(r=>({
    check_id:r.check_id,
    passed:r.passed,
@@ -187,16 +237,18 @@ export async function runPreReportChecks(briefPath=null,{workspaceRoot=null,stat
    execution_ms:r.execution_ms,
    output:String(r.output??'').trim().slice(0,500)
   })),
-  formatted_tests:receipts.map(r=>`check:${r.check_id}::${r.exit_code??1}::${(String(r.output??'').trim().replace(/\r?\n/g,' ').slice(0,240)||(r.passed?'ok':'failed'))}`)
+  formatted_tests:receipts.map(r=>`check:${r.check_id}::${r.exit_code??1}::${summarizeCheckOutput(r)}`)
  };
 }
 
 export async function main(args=process.argv.slice(2)){
- const opts={briefPath:null,workspaceRoot:null,latest:false,status:'reported',summary:'',inspected:[],changed:null,findings:[],evidence:[],blockers:[],errors:[],tests:[],runChecks:false,stateDirectory:DEFAULT_LIVE_STATE};
+ const opts={briefPath:null,workspaceRoot:null,taskId:null,attemptId:null,latest:false,status:'reported',summary:'',inspected:[],changed:null,findings:[],evidence:[],blockers:[],errors:[],tests:[],runChecks:false,stateDirectory:DEFAULT_LIVE_STATE};
  for(let i=0;i<args.length;i++){
   const flag=args[i],val=args[i+1];
   if(flag==='--brief'&&val)opts.briefPath=args[++i];
   else if(flag==='--workspace'&&val)opts.workspaceRoot=args[++i];
+  else if(flag==='--task-id'&&val)opts.taskId=args[++i];
+  else if(flag==='--attempt-id'&&val)opts.attemptId=args[++i];
   else if(flag==='--latest')opts.latest=true;
   else if(flag==='--status'&&val)opts.status=args[++i];
   else if(flag==='--summary'&&val)opts.summary=args[++i];
@@ -211,9 +263,9 @@ export async function main(args=process.argv.slice(2)){
   else if(flag==='--state'&&val)opts.stateDirectory=args[++i];
   else throw Error('Unknown or incomplete option: '+flag);
  }
- opts.briefPath=resolveBriefInput({briefPath:opts.briefPath,workspaceRoot:opts.workspaceRoot,stateDirectory:opts.stateDirectory});
+ opts.briefPath=resolveBriefInput({briefPath:opts.briefPath,workspaceRoot:opts.workspaceRoot,taskId:opts.taskId,attemptId:opts.attemptId,stateDirectory:opts.stateDirectory});
  if(opts.runChecks){
-  const precheck=await runPreReportChecks(opts.briefPath,{workspaceRoot:opts.workspaceRoot,stateDirectory:opts.stateDirectory});
+  const precheck=await runPreReportChecks(opts.briefPath,{workspaceRoot:opts.workspaceRoot,taskId:opts.taskId,attemptId:opts.attemptId,stateDirectory:opts.stateDirectory});
   opts.tests.push(...precheck.formatted_tests);
   if(!precheck.all_passed&&opts.status==='reported'){
    throw Error('Pre-report verification checks failed; fix before reporting to Codex Boss: '+precheck.checks.filter(c=>!c.passed).map(c=>`${c.check_id} (exit ${c.exit_code}): ${c.output}`).join(' | '));

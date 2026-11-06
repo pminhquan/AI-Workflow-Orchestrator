@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {mkdirSync,writeFileSync,readFileSync,existsSync,readdirSync,rmSync,symlinkSync} from 'node:fs';
+import {mkdirSync,writeFileSync,readFileSync,existsSync,readdirSync,rmSync,symlinkSync,utimesSync,statSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {PassThrough} from 'node:stream';
@@ -18,6 +18,7 @@ import {validateSubtaskPlan} from '../../src/desktop-inbox/subtask-planner.mjs';
 import {captureWorkspace} from '../../src/desktop-inbox/verification.mjs';
 import {captureWorkspaceFast} from '../../src/desktop-inbox/fast-snapshot.mjs';
 import {submitWorkerReport} from '../../src/desktop-inbox/report-cli.mjs';
+import {readSelectedReceiver} from '../../src/desktop-inbox/selected-receiver.mjs';
 
 function fixture(){
  const relative=`state/test-universal-${randomUUID()}`,root=resolve(ROOT,relative),stateDirectory=`${relative}/live`;
@@ -27,6 +28,57 @@ function fixture(){
 }
 const submit=(workspace_root)=>({workspace_root,request:'Read README only',read_scope:['README.md'],write_scope:[],acceptance_criteria:['Accurate source finding'],verification_commands:['noop']});
 const successfulTransport=()=>({started:true,exit_code:0,spawn_error:null,timed_out:false,output_overflow:false,stdout_sha256:sha256('ok'),stderr_sha256:sha256('')});
+
+test('final review: mechanical and parent verification rehash same-size preserved-mtime external edits',async()=>{
+ const f=fixture();try{
+  const other=resolve(f.a,'other.txt');writeFileSync(other,'AAAA');utimesSync(other,1600000000,1600000000);
+  const originalTime=statSync(other).mtime;
+  const call=createLiveToolHandler({stateDirectory:f.stateDirectory});
+  writeActiveTarget(f.a,{conversationId:'fresh-hash-chat',stateDirectory:f.stateDirectory});
+  const job=await call('submit_job',submit(f.a));
+  await runLiveSidecarTick({stateDirectory:f.stateDirectory,invokeAgentapi:async()=>successfulTransport()});
+  submitWorkerReport({briefPath:job.brief_json_path,stateDirectory:f.stateDirectory,summary:'Read-only finding'});
+  writeFileSync(other,'BBBB');utimesSync(other,originalTime,originalTime);
+  const result=await call('get_job_result',{workspace_root:f.a,task_id:job.task_id,auto_verify:true});
+  assert.equal(result.auto_verification.passed,false);
+  assert.equal(result.state,'RESULT_READY');
+  await assert.rejects(call('verify_job',{workspace_root:f.a,task_id:job.task_id,accepted:true,review_notes:['Reject external out-of-scope mutation']}),/Out-of-scope/);
+ }finally{f.close();}
+});
+
+test('final review: report CLI rejects altered job or foreign output paths before writing',async()=>{
+ const f=fixture();try{
+  const call=createLiveToolHandler({stateDirectory:f.stateDirectory});
+  const job=await call('submit_job',submit(f.a));
+  const original=readFileSync(job.brief_json_path,'utf8');
+  const foreign=resolve(f.b,'unexpected.md');
+  for(const alter of [brief=>{brief.paths.result_path=foreign;},brief=>{brief.job.write_scope=['README.md'];}]){
+   const brief=JSON.parse(original);alter(brief);writeFileSync(job.brief_json_path,JSON.stringify(brief));
+   assert.throws(()=>submitWorkerReport({briefPath:job.brief_json_path,stateDirectory:f.stateDirectory,summary:'Invalid brief'}),/brief.*(binding|match|path)|immutable/i);
+   assert.equal(existsSync(foreign),false);
+  }
+ }finally{f.close();}
+});
+
+test('final review: missing verified receipt cannot authorize a saved receiver',async()=>{
+ const f=fixture();try{
+  const call=createLiveToolHandler({stateDirectory:f.stateDirectory});await call('bridge_status',{workspace_root:f.a});
+  writeFileSync(resolve(ROOT,f.stateDirectory,'selected-receiver.json'),JSON.stringify({format:'desktop-inbox.selected-receiver@1',enabled:true,conversation_id:'unproven-chat',selected_at:new Date().toISOString(),verified_task_id:randomUUID(),verified_attempt_id:randomUUID(),host_receipt_sha256:sha256('missing receipt'),proves_gui_focus:false}));
+  assert.throws(()=>readSelectedReceiver({stateDirectory:f.stateDirectory}),/SELECTED_RECEIVER_INVALID/);
+ }finally{f.close();}
+});
+
+test('final review: a corrupt inbox fails closed without starving an independent workspace',async()=>{
+ const f=fixture();try{
+  const call=createLiveToolHandler({stateDirectory:f.stateDirectory});
+  writeActiveTarget(f.a,{conversationId:'receiver-a',stateDirectory:f.stateDirectory});writeActiveTarget(f.b,{conversationId:'receiver-b',stateDirectory:f.stateDirectory});
+  const a=await call('submit_job',submit(f.a)),b=await call('submit_job',submit(f.b));
+  const recordPath=resolve(a.task_directory,'record.json'),record=JSON.parse(readFileSync(recordPath,'utf8'));record.format='corrupt';writeFileSync(recordPath,JSON.stringify(record));
+  let sends=0;const tick=await runLiveSidecarTick({stateDirectory:f.stateDirectory,invokeAgentapi:async()=>{sends++;return successfulTransport();}});
+  assert.equal(sends,1);assert.ok(tick.actions.some(action=>action.action==='WORKSPACE_ERROR'));
+  assert.equal(openLiveInbox(f.b,{stateDirectory:f.stateDirectory}).inbox.get(b.task_id).state,'DISPATCHED');
+ }finally{f.close();}
+});
 
 test('idle sidecar does not wake itself by constructing and locking inboxes',async()=>{
  const f=fixture(),controller=new AbortController();let timer;
@@ -281,57 +333,181 @@ test('waves allow adaptive fanout (nine or more independent subtasks) while reje
  }finally{f.close();}
 });
 
-test('latest-wins sequential beacons, zero-ID submit_job, LATEST-JOB.md handoff, and 1-step wait_job(auto_verify=true) with concise_summary',async()=>{
+test('regression 1: auto_verify performs mechanical checks only and never auto-accepts broken or unreviewed source as VERIFIED',async()=>{
  const f=fixture();try{
   let t=Date.now()-15000;
   const now=()=>t;
   const call=createLiveToolHandler({stateDirectory:f.stateDirectory,now});
-
-  // 1. Sequential beacons at different timestamps follow Latest-Wins (no false TARGET_AMBIGUOUS)
-  processBeaconInput({conversationId:'chat-old',workspacePaths:[f.a],timestamp:new Date(t).toISOString()},{stateDirectory:f.stateDirectory,now});
-  t+=5000;
-  processBeaconInput({conversationId:'chat-newest',workspacePaths:[f.a],timestamp:new Date(t).toISOString()},{stateDirectory:f.stateDirectory,now});
-  const readiness=inspectWorkspaceReadiness({workspaceRoot:f.a,stateDirectory:f.stateDirectory,now});
-  assert.equal(readiness.reason_codes.includes('TARGET_AMBIGUOUS'),false);
-  assert.equal(readiness.active_gui_target.conversation_id,'chat-newest');
-
-  // 2. Zero-ceremony submit_job({ workspace_root, request }) requires no read_scope, write_scope, or acceptance_criteria
+  processBeaconInput({conversationId:'chat-verify',workspacePaths:[f.a],timestamp:new Date(t).toISOString()},{stateDirectory:f.stateDirectory,now});
   writeFileSync(resolve(f.a,'helper.mjs'),'export function calcTotal(items) {\n return items.length;\n}\n');
-  const first=await call('submit_job',{workspace_root:f.a,request:'First job left pending'});
-  assert.equal(first.state,'PENDING');
-  assert.equal(first.target_conversation_id,'chat-newest');
-  assert.equal(existsSync(first.latest_job_md_path),true);
-  const latestJobMd=readFileSync(first.latest_job_md_path,'utf8');
-  assert.match(latestJobMd,/Surgical Map/);
-  assert.match(latestJobMd,/L1:calcTotal/);
+  writeFileSync(resolve(f.a,'other.mjs'),'export const keep = true;\n');
 
-  // 3. Submitting a second zero-ceremony job auto-releases the previous pending job without WORKSPACE_SLOT_HELD
+  // Narrow scope inference: one-prompt request targeting calcTotal/helper.mjs scopes write_scope ONLY to helper.mjs (not README.md or other.mjs)
+  const job1=await call('submit_job',{workspace_root:f.a,request:'Update calcTotal in helper.mjs to sum item values'});
+  assert.deepEqual(job1.write_scope,['helper.mjs']);
+  await runLiveSidecarTick({stateDirectory:f.stateDirectory,now,invokeAgentapi:async()=>successfulTransport()});
+
+  // Worker writes syntactically broken source into helper.mjs
+  writeFileSync(resolve(f.a,'helper.mjs'),'export function calcTotal(items) {\n return items.reduce(;\n}\n');
+  submitWorkerReport({briefPath:job1.brief_json_path,summary:'Broken syntax edit',stateDirectory:f.stateDirectory,now});
+
+  const resBroken=await call('get_job_result',{workspace_root:f.a,task_id:job1.task_id,auto_verify:true});
+  assert.equal(resBroken.state,'RESULT_READY');
+  assert.equal(resBroken.auto_verification.passed,false);
+  assert.equal(resBroken.auto_verification.verified,false);
+  assert.match(resBroken.auto_verification.error,/Syntax check failed/);
+
+  const waitedBroken=await call('wait_job',{workspace_root:f.a,task_id:job1.task_id,auto_verify:true});
+  assert.equal(waitedBroken.state,'RESULT_READY');
+  assert.equal(waitedBroken.auto_verification.passed,false);
+  await assert.rejects(call('verify_job',{workspace_root:f.a,task_id:job1.task_id,accepted:true}),/Syntax check failed/);
+
+  // Reject broken job for rework, then test semantically wrong but syntactically valid source
+  await call('verify_job',{workspace_root:f.a,task_id:job1.task_id,accepted:false,review_notes:['Fix syntax error']});
+  writeFileSync(resolve(f.a,'helper.mjs'),'export function calcTotal(items) {\n return items.length;\n}\n');
+
   t+=1000;
-  const second=await call('submit_job',{workspace_root:f.a,request:'Update README with fast summary'});
-  assert.equal(second.state,'PENDING');
-  assert.equal((await call('get_job_status',{workspace_root:f.a,task_id:first.task_id})).outcome,'RELEASED');
+  const job2=await call('submit_job',{workspace_root:f.a,request:'Update calcTotal in helper.mjs to sum numbers'});
+  await runLiveSidecarTick({stateDirectory:f.stateDirectory,now,invokeAgentapi:async()=>successfulTransport()});
+  writeFileSync(resolve(f.a,'helper.mjs'),'export function calcTotal() {\n return 0; // wrong logic\n}\n');
+  submitWorkerReport({briefPath:job2.brief_json_path,summary:'Returned constant 0',stateDirectory:f.stateDirectory,now});
 
-  // 4. Worker edits file and submits concise summary without passing briefPath (uses latest-brief.json even from PENDING)
-  writeFileSync(resolve(f.a,'README.md'),'# Independent project\nUpdated in fast mode.\n');
-  const reportOut=submitWorkerReport({
-   workspaceRoot:f.a,
-   summary:'Updated README.md with fast mode line; verified formatting.',
-   tests:['node -e "process.exit(0)"::0::ok'],
+  // Even when mechanical checks pass, auto_verify=true MUST NOT transition state to VERIFIED before parent review
+  const waitedMechanical=await call('wait_job',{workspace_root:f.a,auto_verify:true});
+  assert.equal(waitedMechanical.task_id,job2.task_id);
+  assert.equal(waitedMechanical.state,'RESULT_READY');
+  assert.equal(waitedMechanical.auto_verification.passed,true);
+  assert.equal(waitedMechanical.auto_verification.mechanical_only,true);
+  assert.equal(waitedMechanical.auto_verification.verified,false);
+  assert.equal(waitedMechanical.auto_verification.requires_parent_review,true);
+  assert.deepEqual(waitedMechanical.auto_verification.actual_changed_files,['helper.mjs']);
+ }finally{f.close();}
+});
+
+test('regression 2: uncertain delivery or running job is never auto-released or resent, while other workspaces run independently',async()=>{
+ const f=fixture();try{
+  let t=Date.now()-1000000;
+  const now=()=>t;
+  const call=createLiveToolHandler({stateDirectory:f.stateDirectory,now});
+  processBeaconInput({conversationId:'chat-a',workspacePaths:[f.a],timestamp:new Date(t).toISOString()},{stateDirectory:f.stateDirectory,now});
+  processBeaconInput({conversationId:'chat-b',workspacePaths:[f.b],timestamp:new Date(t).toISOString()},{stateDirectory:f.stateDirectory,now});
+
+  const uncertainJob=await call('submit_job',{workspace_root:f.a,request:'Update README.md section'});
+  let sendCalls=0;
+  const tick1=await runLiveSidecarTick({
    stateDirectory:f.stateDirectory,
-   now
+   now,
+   invokeAgentapi:async()=>{
+    sendCalls++;
+    return {started:true,exit_code:null,spawn_error:null,timed_out:true,output_overflow:false,stdout_sha256:sha256(''),stderr_sha256:sha256('')};
+   }
   });
-  assert.equal(reportOut.inbox_state,'RESULT_READY');
-  assert.equal(existsSync(reportOut.latest_summary_md_path),true);
+  assert.equal(sendCalls,1,'Must not fallback-retry a timed-out send');
+  assert.equal(tick1.actions[0].action,'UNCERTAIN_DELIVERY');
 
-  // 5. Codex Boss calls wait_job({ workspace_root, auto_verify: true }) WITHOUT task_id -> auto-verifies and returns concise_summary!
-  t+=1000;
-  const waited=await call('wait_job',{workspace_root:f.a,auto_verify:true});
-  assert.equal(waited.timed_out,false);
-  assert.equal(waited.task_id,second.task_id);
-  assert.equal(waited.state,'VERIFIED');
-  assert.equal(waited.concise_summary.status,'reported');
-  assert.equal(waited.concise_summary.headline,'Updated README.md with fast mode line; verified formatting.');
-  assert.deepEqual(waited.concise_summary.changed_files,['README.md']);
-  assert.equal(waited.concise_summary.errors.length,0);
+  // Advance clock > 10 minutes (MAX_JOB_AGE_MS): sidecar must NOT auto-release or resend uncertain delivery
+  t+=700000;
+  processBeaconInput({conversationId:'chat-a',workspacePaths:[f.a],timestamp:new Date(t).toISOString()},{stateDirectory:f.stateDirectory,now});
+  await runLiveSidecarTick({
+   stateDirectory:f.stateDirectory,
+   now,
+   invokeAgentapi:async()=>{sendCalls++;return successfulTransport();}
+  });
+  assert.equal(sendCalls,1,'Uncertain job must never be resent');
+  const statusAfterTimeout=await call('get_job_status',{workspace_root:f.a,task_id:uncertainJob.task_id});
+  assert.equal(statusAfterTimeout.outcome,'UNCERTAIN_DELIVERY');
+
+  // New submit_job on workspace A (even with replace_active: true) must NOT release the uncertain job
+  await assert.rejects(
+   call('submit_job',{workspace_root:f.a,request:'Update README.md again',replace_active:true}),
+   /active/
+  );
+
+  // Meanwhile workspace B operates independently
+  const jobB=await call('submit_job',{workspace_root:f.b,request:'Read README.md in B',read_only:true});
+  assert.equal(jobB.state,'PENDING');
+ }finally{f.close();}
+});
+
+test('regression 3: worker reports bind strictly to workspace_root, task_id and attempt_id and never collide across projects',async()=>{
+ const f=fixture();try{
+  const call=createLiveToolHandler({stateDirectory:f.stateDirectory});
+  const jobA=await call('submit_job',{workspace_root:f.a,request:'Update README.md in project A'});
+  const jobB=await call('submit_job',{workspace_root:f.b,request:'Update README.md in project B'});
+
+  // Unbound report without --brief, --workspace, or --task-id must reject instead of picking up global latest (project B)
+  assert.throws(
+   ()=>submitWorkerReport({summary:'Unbound report',stateDirectory:f.stateDirectory}),
+   /Missing brief or workspace binding/
+  );
+
+  // Mismatched workspace or task_id with jobA's brief must reject
+  assert.throws(
+   ()=>submitWorkerReport({briefPath:jobA.brief_json_path,workspaceRoot:f.b,summary:'Wrong workspace',stateDirectory:f.stateDirectory}),
+   /Workspace mismatch/
+  );
+  assert.throws(
+   ()=>submitWorkerReport({briefPath:jobA.brief_json_path,taskId:jobB.task_id,summary:'Wrong task',stateDirectory:f.stateDirectory}),
+   /Task ID mismatch/
+  );
+
+  // Reporting for project A via explicit briefPath updates only project A while project B stays PENDING
+  writeFileSync(resolve(f.a,'README.md'),'# Independent project A updated\n');
+  const repA=submitWorkerReport({
+   briefPath:jobA.brief_json_path,
+   workspaceRoot:f.a,
+   taskId:jobA.task_id,
+   attemptId:jobA.attempt_id,
+   summary:'Updated project A README cleanly',
+   stateDirectory:f.stateDirectory
+  });
+  assert.equal(repA.task_id,jobA.task_id);
+  assert.equal(repA.inbox_state,'RESULT_READY');
+  assert.equal((await call('get_job_status',{workspace_root:f.b,task_id:jobB.task_id})).state,'PENDING');
+ }finally{f.close();}
+});
+
+test('regression 4: new hook beacon never overwrites a verified selected receiver and ambiguous strict targets hold the job',async()=>{
+ const f=fixture();try{
+  let t=Date.now()-20000;
+  const now=()=>t;
+  const call=createLiveToolHandler({stateDirectory:f.stateDirectory,now});
+
+  // 1. Establish a parent-VERIFIED selected receiver on chat-verified
+  processBeaconInput({conversationId:'chat-verified',workspacePaths:[f.a],timestamp:new Date(t).toISOString()},{stateDirectory:f.stateDirectory,now});
+  const seedJob=await call('submit_job',submit(f.a));
+  await runLiveSidecarTick({
+   stateDirectory:f.stateDirectory,
+   now,
+   env:{ANTIGRAVITY_AGENTAPI_EXE:process.execPath,ANTIGRAVITY_LS_ADDRESS:'local-test'},
+   invokeAgentapi:async()=>successfulTransport()
+  });
+  submitWorkerReport({briefPath:seedJob.brief_json_path,summary:'Seed verified receiver',inspected:['README.md'],evidence:['README.md:1'],stateDirectory:f.stateDirectory,now});
+  await call('verify_job',{workspace_root:f.a,task_id:seedJob.task_id,accepted:true,select_receiver:true});
+  assert.equal(readSelectedReceiver({stateDirectory:f.stateDirectory}).conversation_id,'chat-verified');
+
+  // 2. A new hook fires on a different conversation (chat-intruder) with a newer timestamp
+  t+=5000;
+  processBeaconInput({conversationId:'chat-intruder',workspacePaths:[f.a],timestamp:new Date(t).toISOString()},{stateDirectory:f.stateDirectory,now});
+
+  // Selected receiver MUST remain chat-verified (not overwritten or bypassed by the newer hook)
+  assert.equal(readSelectedReceiver({stateDirectory:f.stateDirectory}).conversation_id,'chat-verified');
+  const statusSelected=await call('bridge_status',{workspace_root:f.a});
+  assert.equal(statusSelected.delivery_target.mode,'user_selected_receiver');
+  assert.equal(statusSelected.delivery_target.conversation_id,'chat-verified');
+
+  // 3. In strict mode (use_selected_receiver: false), the two fresh hooks on f.a flag TARGET_AMBIGUOUS and hold the job in PENDING
+  const strictJob=await call('submit_job',{...submit(f.a),use_selected_receiver:false});
+  assert.ok(strictJob.reason_codes.includes('TARGET_AMBIGUOUS'));
+  assert.equal(strictJob.target_conversation_id,null);
+  let strictCalls=0;
+  const strictTick=await runLiveSidecarTick({
+   stateDirectory:f.stateDirectory,
+   now,
+   invokeAgentapi:async()=>{strictCalls++;return successfulTransport();}
+  });
+  assert.equal(strictCalls,0,'Ambiguous target must hold job and never guess conversation');
+  assert.equal(strictTick.actions.find(a=>a.task_id===strictJob.task_id).action,'WAITING_FOR_GUI_SESSION');
+  assert.equal((await call('get_job_status',{workspace_root:f.a,task_id:strictJob.task_id})).state,'PENDING');
  }finally{f.close();}
 });

@@ -6,7 +6,6 @@ import {Inbox} from './inbox.mjs';
 import {UUID,MAX_REPORT_BYTES,canonicalWorkspace,sameWorkspace,validateReport,isSensitivePath,validateScopePath} from './contracts.mjs';
 import {EXCLUDED_ROOTS,readBoundedBytes} from './verification.mjs';
 import {renderSubtaskPlanMarkdown} from './subtask-planner.mjs';
-import {buildSurgicalSymbolMap,renderSurgicalMapMarkdown} from './codebase-map.mjs';
 
 export const DEFAULT_LIVE_STATE='state/desktop-inbox-live';
 const TARGET_ID=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -231,7 +230,7 @@ export function defaultWorkspaceScopes(workspaceRoot){
  const ws=canonicalWorkspace(workspaceRoot);
  const scopes=[];
  for(const name of readdirSync(ws).sort()){
-  if(EXCLUDED_ROOTS.includes(name.toLowerCase())||name==='.codex'||isSensitivePath(name))continue;
+  if(EXCLUDED_ROOTS.includes(name.toLowerCase())||name==='.codex'||name==='.gemini'||isSensitivePath(name))continue;
   try{
    validateScopePath(ws,name);
    scopes.push(name);
@@ -239,6 +238,106 @@ export function defaultWorkspaceScopes(workspaceRoot){
   }catch{}
  }
  return scopes.length?scopes:['README.md'];
+}
+
+const WRITE_INTENT_RE=/\b(update|edit|modify|write|fix|add|create|implement|refactor|change|patch|remove|delete|rename|optimize|sửa|thêm|tạo|viết|cập nhật|xóa|tối ưu)\b/i;
+const STOP_WORDS=new Set(['update','edit','modify','write','fix','add','create','implement','refactor','change','patch','remove','delete','rename','optimize','with','fast','summary','the','and','for','from','into','that','this','have','has','not','are','was','were','will','can','should','would','could','please','file','files','code','test','tests','job','task','function','class','method','module','return','returns','value','input','output','sua','them','tao','viet','cap','nhat','xoa','toi']);
+
+function escapeRegExp(s){
+ return String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+}
+
+export function inferJobScopes(workspaceRoot,request,{readScope=null,writeScope=undefined,readOnly=false,subtasks=null}={}){
+ const ws=canonicalWorkspace(workspaceRoot);
+ const files=[];
+ function walk(relDir=''){
+  if(files.length>=400)return;
+  const absDir=relDir?scopedPath(ws,relDir):ws;
+  let entries=[];
+  try{entries=readdirSync(absDir).sort();}catch{return;}
+  for(const name of entries){
+   if(files.length>=400)break;
+   const lower=name.toLowerCase();
+   if(EXCLUDED_ROOTS.includes(lower)||name==='.codex'||name==='.gemini')continue;
+   const rel=relDir?`${relDir}/${name}`:name;
+   if(isSensitivePath(rel))continue;
+   let stat;
+   try{
+    validateScopePath(ws,rel);
+    stat=lstatSync(scopedPath(ws,rel));
+   }catch{continue;}
+   if(stat.isSymbolicLink())continue;
+   if(stat.isDirectory())walk(rel);
+   else if(stat.isFile())files.push(rel);
+  }
+ }
+ walk();
+
+ const hasSubtaskWrites=Array.isArray(subtasks)&&subtasks.some(s=>Array.isArray(s?.write_scope)&&s.write_scope.length>0);
+ let resolvedWrite;
+ if(writeScope!==undefined){
+  resolvedWrite=Array.isArray(writeScope)?[...writeScope]:writeScope;
+ }else if(readOnly===true){
+  resolvedWrite=[];
+ }else if(Array.isArray(readScope)&&readScope.length>0&&!hasSubtaskWrites){
+  resolvedWrite=[];
+ }else if(hasSubtaskWrites){
+  resolvedWrite=[...new Set(subtasks.flatMap(s=>s.write_scope??[]))];
+ }else{
+  const reqText=String(request??'');
+  if(!WRITE_INTENT_RE.test(reqText)){
+   resolvedWrite=[];
+  }else{
+   const matched=[];
+   for(const rel of files){
+    const base=basename(rel);
+    const stem=base.replace(/\.[^.]+$/,'');
+    const relRe=new RegExp(`(^|[^A-Za-z0-9_./\\\\-])${escapeRegExp(rel)}($|[^A-Za-z0-9_./\\\\-])`,'i');
+    const baseRe=new RegExp(`(^|[^A-Za-z0-9_./\\\\-])${escapeRegExp(base)}($|[^A-Za-z0-9_./\\\\-])`,'i');
+    const stemRe=stem.length>=2&&!STOP_WORDS.has(stem.toLowerCase())?new RegExp(`\\b${escapeRegExp(stem)}\\b`,'i'):null;
+    if(relRe.test(reqText)||baseRe.test(reqText)||(stemRe&&stemRe.test(reqText))){
+     matched.push(rel);
+    }
+   }
+   if(matched.length>0){
+    resolvedWrite=[...new Set(matched)].slice(0,32);
+   }else{
+    const rawTokens=reqText.match(/[A-Za-z_][A-Za-z0-9_]{2,}/g)??[];
+    const tokens=[...new Set(rawTokens.filter(t=>!STOP_WORDS.has(t.toLowerCase())))];
+    const scored=[];
+    if(tokens.length>0){
+     const tokenRegexes=tokens.map(t=>new RegExp(`\\b${escapeRegExp(t)}\\b`));
+     for(const rel of files){
+      try{
+       const full=scopedPath(ws,rel);
+       const stat=lstatSync(full);
+       if(!stat.isFile()||stat.size>131072)continue;
+       const text=readBoundedBytes(full,131072).toString('utf8');
+       let hits=0;
+       for(const rx of tokenRegexes){if(rx.test(text))hits++;}
+       if(hits>0)scored.push({rel,hits});
+      }catch{}
+     }
+     scored.sort((a,b)=>b.hits-a.hits||a.rel.localeCompare(b.rel));
+    }
+    if(scored.length>0){
+     resolvedWrite=scored.slice(0,4).map(x=>x.rel);
+    }else if(files.length===1){
+     resolvedWrite=[files[0]];
+    }else{
+     resolvedWrite=[];
+    }
+   }
+  }
+ }
+
+ const resolvedRead=Array.isArray(readScope)&&readScope.length>0
+  ?[...new Set([...resolvedWrite,...readScope])]
+  :[...new Set([...resolvedWrite,...defaultWorkspaceScopes(ws)])].slice(0,32);
+ return {
+  readScope:resolvedRead.length?resolvedRead:['README.md'],
+  writeScope:resolvedWrite
+ };
 }
 
 export function resolveLatestWorkspaceTask(workspaceRoot,{stateDirectory=DEFAULT_LIVE_STATE,now=Date.now}={}){
@@ -324,22 +423,9 @@ export function writeJobBrief(inbox,job,{subtaskPlan=null,stateDirectory=DEFAULT
  };
  atomicWriteJSON(paths.brief_json_path,briefPayload);
  atomicWriteJSON(latestPaths.latest_brief_json_path,briefPayload);
- try{atomicWriteJSON(latestPaths.global_latest_brief_json_path,briefPayload);}catch{}
  const modeLabel=job.write_scope.length?'WRITE-SCOPED (được phép sửa trong write_scope)':'READ-ONLY (chỉ đọc, tuyệt đối không sửa file trong workspace)';
  const writeLines=job.write_scope.length?job.write_scope.map(p=>`- \`${p}\``).join('\n'):'- *(Trống — nhiệm vụ chỉ đọc)*';
- const autoSubagentLines=[
-  '',
-  '## 1.5. Điều phối Subagent Tự động (Auto-Subagent Protocol — Không đợi nhắc)',
-  '- **1 file / sửa nhỏ cục bộ:** Tự làm **DIRECT** ngay, đọc theo `StartLine..EndLine` từ Surgical Map.',
-  '- **Khảo sát rộng (>= 2 vùng độc lập):** Tự động gọi song song `invoke_subagent({ TypeName: "research", ... })` ngay lượt đầu.',
-  '- **Từ >= 2 phần việc hoặc >= 2 file/module độc lập:** Tự đóng vai **Team Lead**, tách `write_scope` không trùng nhau và gọi song song `invoke_subagent({ TypeName: "self", Workspace: "inherit", ... })`.'
- ];
- const subtaskMd=subtaskPlan?['',renderSubtaskPlanMarkdown(subtaskPlan).trimEnd()]:autoSubagentLines;
- let surgicalMapMd=[];
- try{
-  const mapText=renderSurgicalMapMarkdown(buildSurgicalSymbolMap(job.workspace_root,[...job.write_scope,...job.read_scope]));
-  if(mapText)surgicalMapMd=['',mapText];
- }catch{}
+ const subtaskMd=subtaskPlan?['',renderSubtaskPlanMarkdown(subtaskPlan).trimEnd()]:[];
  const md=[
   `# Codex Boss Job Brief — \`${job.task_id}\``,
   '',
@@ -361,7 +447,6 @@ export function writeJobBrief(inbox,job,{subtaskPlan=null,stateDirectory=DEFAULT
   '',
   '### Write Scope (`write_scope`)',
   writeLines,
-  ...surgicalMapMd,
   '',
   '## 3. Tiêu chí nghiệm thu (`acceptance_criteria`) & Checks (`verification_commands`)',
   '',
@@ -371,21 +456,18 @@ export function writeJobBrief(inbox,job,{subtaskPlan=null,stateDirectory=DEFAULT
   '',
   '## 4. Lệnh ghi Summary ngắn gọn báo về Codex Boss (BẮT BUỘC)',
   '',
-  'Khi làm xong, chỉ cần chạy **1 lệnh ngắn gọn** dưới đây để ghi Summary cho Codex đọc ngay (không cần truyền ID):',
+  'Khi hoàn tất, chạy lệnh dưới đây để kiểm tra và nộp báo cáo gắn đúng brief hiện tại:',
   '',
   '```powershell',
-  `node "${reportCliPosix}" --latest --run-checks --summary "<tóm tắt ngắn gọn: đã sửa gì, ở file nào, kết quả test>"`,
+  `node "${reportCliPosix}" --brief "${briefJsonPosix}" --run-checks --summary "<tóm tắt ngắn gọn: đã sửa gì, ở file nào, kết quả test>"`,
   '```',
   '',
-  '*(Hoặc lệnh đầy đủ tương thích ngược:)*',
-  '```powershell',
-  `node "${reportCliPosix}" --brief "${briefJsonPosix}" --run-checks --status reported --summary "<tóm tắt kết quả ngắn gọn>"`,
-  '```',
+  '- Nếu bị chặn: thêm `--status blocked --blocker "<lý do>"`',
+  '- Nếu lỗi không thể hoàn thành: thêm `--status failed --error "<lỗi>"`',
   ''
  ].join('\n');
  atomicWriteText(paths.brief_md_path,md);
  atomicWriteText(latestPaths.latest_job_md_path,md);
- try{atomicWriteText(latestPaths.global_latest_job_md_path,md);}catch{}
  return paths;
 }
 
@@ -398,7 +480,7 @@ export function buildSingleLineTrigger(job,briefMdPath,{subtaskPlan=null}={}){
  const mode=job.write_scope.length?'WRITE':'READ';
  const swarmTag=subtaskPlan?` | SWARM ${subtaskPlan.total_subtasks}x/W${subtaskPlan.waves.length}`:'';
  const cleanGoal=String(job.goal).replace(/[\r\n\t]+/g,' ').replace(/\s+/g,' ').trim().slice(0,200);
- const trigger=`[Codex Boss Job ${job.task_id.slice(0,8)} | ${mode}${swarmTag}] Đọc và thực hiện đúng brief tại ${briefPosix} — Yêu cầu: ${cleanGoal}. Tự động chia việc gọi invoke_subagent song song nếu có >=2 phần độc lập; khi hoàn tất, chạy lệnh report-cli --run-checks trong brief để nộp Summary cho Codex.`.replace(/[\r\n\t\x00-\x1f]+/g,' ').trim();
+ const trigger=`[Codex Boss Job ${job.task_id.slice(0,8)} | ${mode}${swarmTag}] Đọc và thực hiện đúng brief tại ${briefPosix} — Yêu cầu: ${cleanGoal}. Khi hoàn tất, chạy lệnh report-cli --brief trong brief để nộp báo cáo cho Codex.`.replace(/[\r\n\t\x00-\x1f]+/g,' ').trim();
  if(/[\r\n\0]/.test(trigger)||!trigger.length)throw Error('Single-line trigger invariant violated');
  return trigger;
 }
