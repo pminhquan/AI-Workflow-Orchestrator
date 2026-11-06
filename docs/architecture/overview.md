@@ -2,7 +2,7 @@
 
 ## Phạm vi
 
-Một canonical source tạo provider-specific artifacts vào staging. Router offline giúp kiểm thử quyết định DIRECT/DELEGATED/TEAM. Scheduler chỉ điều phối adapter local Mock/Replay. CLI không gọi Codex, Antigravity hoặc Gemini và không ghi live config.
+Một canonical source tạo provider-specific artifacts vào staging. Router offline giúp kiểm thử quyết định DIRECT/DELEGATED/TEAM. Scheduler chỉ điều phối adapter local Mock/Replay. Core CLI không gọi Codex, Antigravity hoặc Gemini và không ghi live config. App-owned live bridge và global installer là scope riêng ở phần cuối.
 
 ```mermaid
 flowchart TD
@@ -65,7 +65,7 @@ Restart giữ queued/review/failure state. Task đang running được `recover(
 
 Cancellation dừng adapter mock hợp tác với AbortSignal, không tuyên bố dừng agent native. Integration/merge và planning/dispatch AI cost chưa được triển khai; metrics không đo được phải là null.
 
-## Disabled Desktop inbox candidate
+## Legacy disabled Desktop inbox candidate
 
 `src/desktop-inbox/` is a separate, explicitly requested file handoff candidate, not another agent scheduler: no DAG, retry engine, native lifecycle owner or SQLite ledger. It does not enable a runtime in the routing registry. One configured inbox binds one canonical workspace/project; atomic publication/claim and durable dispatch intent prevent ordinary duplicate attempts. Uncertain delivery retains the workspace slot and is never automatically resubmitted.
 
@@ -79,3 +79,11 @@ result watcher reuses existing verification and cannot dispatch. The original
 mock runner/live gate and V2 native delegation remain independent. See
 [current pilot controls](../operations/desktop-mcp-relay.md); no real dispatch is
 claimed without App outcome and independent result verification.
+
+## Global live Desktop bridge
+
+Separate from the offline Mock/Replay core, the live App-owned bridge (`src/desktop-inbox/live-*.mjs`) is installed once at user scope by `scripts/install-global-desktop-bridge.mjs` over six owned targets (Codex MCP block, Codex guidance section, Boss skill, Hook, Worker skill, one Sidecar) with a durable receipt and exact rollback. New projects need no local hooks, skills or MCP files.
+
+Context: each request passes `workspace_root` from the current session; clients with MCP roots are checked against `roots/list`, otherwise the value is model-supplied context rather than host attestation. Routing is either strict matching-workspace Beacon or an explicitly chosen persistent receiver created from a parent-VERIFIED delivery. The receiver is a delivery address only: it never changes the work root, grants no permission and does not prove GUI focus. New bound routes carry a checksum of the frozen selection to detect corruption; this is not authentication or a sandbox. A fresh chat needs one hook event to bootstrap a Beacon.
+
+Worker reports stay untrusted; the parent verifies source, scope and fresh checks. Antigravity subagent fanout within `subtasks` waves is adaptive to useful independent work and actual payload/platform bounds (no arbitrary two-worker or eight-subtask cap, with disjoint write scopes, no same-wave read/write or write/write conflicts, and no nested teams), while native Codex and offline scheduler profiles keep their own limits. Evidence: OFFLINE-TESTED with mocked transport, plus session evidence for read-only jobs to a chosen receiver on two other projects. Fresh Codex global discovery was session-verified on the tested host. Fresh Antigravity global discovery, host-attested roots and GUI focus remain NOT VERIFIED. The legacy V1 checksum drift is a separate baseline. See the [operation guide](../operations/global-desktop-bridge.md).

@@ -8,6 +8,7 @@ import {
  activeTargetPath,
  checkedStateDirectory,
  existingLiveInbox,
+ readTargetCandidates,
  resolveWorkspaceConfig,
  sidecarHeartbeatPath
 } from './live-bridge.mjs';
@@ -29,6 +30,7 @@ export const READINESS_REASONS=Object.freeze({
  TARGET_FOREIGN_PROJECT:'TARGET_FOREIGN_PROJECT',
  TARGET_FUTURE:'TARGET_FUTURE',
  TARGET_STALE:'TARGET_STALE',
+ TARGET_AMBIGUOUS:'TARGET_AMBIGUOUS',
  WORKSPACE_SLOT_HELD:'WORKSPACE_SLOT_HELD'
 });
 
@@ -110,6 +112,7 @@ export function evaluateBridgeReadiness({
  heartbeatError=null,
  target,
  targetError=null,
+ targetAmbiguous=false,
  records=[],
  now=Date.now,
  heartbeatMaxAgeMs=HEARTBEAT_MAX_AGE_MS,
@@ -225,6 +228,7 @@ export function evaluateBridgeReadiness({
   reasonCodes.push(READINESS_REASONS.WORKSPACE_SLOT_HELD);
  }
 
+ if(targetAmbiguous)reasonCodes.push(READINESS_REASONS.TARGET_AMBIGUOUS);
  const readyToDispatch=reasonCodes.length===0;
  return {
   ready_to_dispatch:readyToDispatch,
@@ -244,17 +248,17 @@ export function evaluateBridgeReadiness({
   sidecar_code_version:heartbeatValid&&typeof heartbeat.code_version==='string'?heartbeat.code_version:null,
   heartbeat_age_ms:heartbeatAgeMs,
   heartbeat_max_age_ms:heartbeatMaxAgeMs,
-  active_gui_target:targetValidAndBound?target:null,
+  active_gui_target:targetValidAndBound&&!targetAmbiguous?target:null,
   target_age_ms:targetAgeMs,
   target_ttl_ms:targetTtlMs,
   target_observation:{
    present:target!==null&&target!==undefined&&!targetError,
    valid:targetStructurallyValid,
    bound:targetValidAndBound,
-   fresh:targetFresh,
+   fresh:targetFresh&&!targetAmbiguous,
    age_ms:targetAgeMs,
    ttl_ms:targetTtlMs,
-   conversation_id:targetValidAndBound?target.conversation_id:null,
+   conversation_id:targetValidAndBound&&!targetAmbiguous?target.conversation_id:null,
    source:'hook_beacon_observation',
    proves_gui_focus:false
   }
@@ -298,6 +302,22 @@ export function inspectWorkspaceReadiness({
  const rawHeartbeat=readRawJsonFile(sidecarHeartbeatPath(checkedState),8192);
  const rawTarget=readRawJsonFile(activeTargetPath(config.workspace_root,checkedState),8192);
  const sampledNowMs=resolveNowMs(clockFn);
+ let targetAmbiguous=false,candidateError=null;
+ try{
+  const activeMs=isPlainObject(rawTarget.value)?parseStrictIsoMs(rawTarget.value.updated_at):null;
+  const candidates=readTargetCandidates(config.workspace_root,{stateDirectory:checkedState});
+  const freshIds=new Set();
+  for(const target of candidates){
+   const checked=evaluateBridgeReadiness({workspaceRoot:config.workspace_root,projectId:config.slug,target,heartbeat:rawHeartbeat.value,now:sampledNowMs,targetTtlMs});
+   if(checked.target_observation.bound&&checked.target_observation.fresh){
+    const candidateMs=parseStrictIsoMs(target.updated_at);
+    if(activeMs===null||(candidateMs!==null&&candidateMs>=activeMs)){
+     freshIds.add(target.conversation_id);
+    }
+   }
+  }
+  targetAmbiguous=freshIds.size>1;
+ }catch(error){candidateError=error.message;}
  const evaluation=evaluateBridgeReadiness({
   workspaceRoot:config.workspace_root,
   projectId:config.slug,
@@ -305,7 +325,8 @@ export function inspectWorkspaceReadiness({
   heartbeat:rawHeartbeat.value,
   heartbeatError:rawHeartbeat.error,
   target:rawTarget.value,
-  targetError:rawTarget.error,
+  targetError:rawTarget.error??candidateError,
+  targetAmbiguous,
   records:inboxRecords,
   now:sampledNowMs,
   heartbeatMaxAgeMs,

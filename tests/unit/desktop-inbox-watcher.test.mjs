@@ -35,7 +35,9 @@ test('project MCP config is fingerprinted without granting worker access or read
   try {second.submit(h.job,{baseline:before});}finally{assert.ok(inside(resolve(ROOT,'state'),second.root));rmSync(second.root,{recursive:true,force:true});}
   assert.throws(()=>validateScopePath(h.workspace,'.codex/config.toml'),/Sensitive/);
   writeFileSync(resolve(h.workspace,'.codex/config.toml'),'changed');assert.notEqual(captureWorkspace(h.workspace).hash,before.hash);
-  writeFileSync(resolve(h.workspace,'.codex/auth.json'),'private content');assert.throws(()=>captureWorkspace(h.workspace),/Unexpected private/);
+  const sourceHash=captureWorkspace(h.workspace).hash;
+  writeFileSync(resolve(h.workspace,'.codex/auth.json'),'private content');assert.equal(captureWorkspace(h.workspace).hash,sourceHash);
+  assert.equal(Object.hasOwn(captureWorkspace(h.workspace).entries,'.codex/auth.json'),false);
  }finally{h.close();}
 });
 

@@ -1,11 +1,12 @@
 import {randomUUID} from 'node:crypto';
-import {existsSync,mkdirSync,openSync,writeFileSync,fsyncSync,closeSync,renameSync,unlinkSync,readdirSync,lstatSync} from 'node:fs';
+import {existsSync,mkdirSync,openSync,writeFileSync,fsyncSync,closeSync,renameSync,unlinkSync,readdirSync,lstatSync,linkSync} from 'node:fs';
 import {basename,dirname,resolve} from 'node:path';
 import {ROOT,safeRelative,scopedPath,sha256} from '../core/util.mjs';
 import {Inbox} from './inbox.mjs';
-import {UUID,MAX_REPORT_BYTES,canonicalWorkspace,sameWorkspace,validateReport} from './contracts.mjs';
-import {readBoundedBytes} from './verification.mjs';
+import {UUID,MAX_REPORT_BYTES,canonicalWorkspace,sameWorkspace,validateReport,isSensitivePath,validateScopePath} from './contracts.mjs';
+import {EXCLUDED_ROOTS,readBoundedBytes} from './verification.mjs';
 import {renderSubtaskPlanMarkdown} from './subtask-planner.mjs';
+import {buildSurgicalSymbolMap,renderSurgicalMapMarkdown} from './codebase-map.mjs';
 
 export const DEFAULT_LIVE_STATE='state/desktop-inbox-live';
 const TARGET_ID=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -21,7 +22,7 @@ export function atomicWriteBytes(path,bytes,{exclusive=false}={}){
  const temp=path+'.tmp-'+randomUUID();let fd;
  try{
   fd=openSync(temp,'wx');writeFileSync(fd,bytes);fsyncSync(fd);closeSync(fd);fd=undefined;
-  if(exclusive){if(existsSync(path))throw Object.assign(Error('File already exists'),{code:'EEXIST'});renameSync(temp,path);}
+  if(exclusive){linkSync(temp,path);unlinkSync(temp);}
   else renameSync(temp,path);
  }finally{
   if(fd!==undefined)closeSync(fd);
@@ -119,7 +120,24 @@ export function registerLocalWorkspace(workspaceRoot,{allowNewConversation=false
  return resolveWorkspaceConfig(workspace,{stateDirectory});
 }
 
-export function writeActiveTarget(workspaceRoot,{conversationId,eventName='SessionStart',modelName=null,stateDirectory=DEFAULT_LIVE_STATE,now=Date.now}={}){
+// One immutable registration per canonical workspace avoids a shared registry
+// read/modify/write race between independent global MCP processes.
+export function ensureWorkspaceRegistration(workspaceRoot,{stateDirectory=DEFAULT_LIVE_STATE}={}){
+ const workspace=canonicalWorkspace(workspaceRoot);
+ const path=scopedPath(ROOT,`${workspaceStateRelative(workspace,stateDirectory)}/registration.json`);
+ if(!existsSync(path))atomicWriteJSON(path,{format:'desktop-inbox.registration@1',workspace_root:workspace,project_id:workspaceSlug(workspace)});
+ return {path,workspace_root:workspace};
+}
+
+export function readTargetCandidates(workspaceRoot,{stateDirectory=DEFAULT_LIVE_STATE}={}){
+ const directory=scopedPath(ROOT,`${workspaceStateRelative(workspaceRoot,stateDirectory)}/targets`);
+ if(!existsSync(directory))return [];
+ const names=readdirSync(directory).filter(name=>/^[a-f0-9]{64}\.json$/.test(name));
+ if(names.length>128)throw Error('Too many target observations; explicit review required');
+ return names.map(name=>readBoundedJSON(scopedPath(directory,name),8192));
+}
+
+export function writeActiveTarget(workspaceRoot,{conversationId,eventName='SessionStart',modelName=null,workspacePaths=null,eventTimestamp=null,stateDirectory=DEFAULT_LIVE_STATE,now=Date.now}={}){
  const config=resolveWorkspaceConfig(workspaceRoot,{stateDirectory});
  if(typeof conversationId!=='string'||!TARGET_ID.test(conversationId.trim()))throw Error('Invalid conversationId for active target');
  const payload={
@@ -129,8 +147,12 @@ export function writeActiveTarget(workspaceRoot,{conversationId,eventName='Sessi
   conversation_id:conversationId.trim(),
   event_name:String(eventName??'SessionStart').slice(0,64),
   model_name:typeof modelName==='string'&&modelName.trim()?modelName.trim().slice(0,128):null,
-  updated_at:new Date(now()).toISOString()
+  updated_at:eventTimestamp??new Date(now()).toISOString()
  };
+ ensureWorkspaceRegistration(config.workspace_root,{stateDirectory});
+ const observation={...payload,workspace_paths:workspacePaths??[config.workspace_root],event_timestamp:payload.updated_at,observed_at:new Date(now()).toISOString()};
+ const candidatePath=scopedPath(ROOT,`${workspaceStateRelative(config.workspace_root,stateDirectory)}/targets/${sha256(payload.conversation_id)}.json`);
+ atomicWriteJSON(candidatePath,observation);
  const path=activeTargetPath(config.workspace_root,stateDirectory);
  atomicWriteJSON(path,payload);
  return {path,target:payload};
@@ -167,6 +189,7 @@ export function readSidecarHeartbeat({stateDirectory=DEFAULT_LIVE_STATE}={}){
 
 export function openLiveInbox(workspaceRoot=ROOT,{stateDirectory=DEFAULT_LIVE_STATE,now=Date.now}={}){
  const config=resolveWorkspaceConfig(workspaceRoot,{stateDirectory});
+ ensureWorkspaceRegistration(config.workspace_root,{stateDirectory});
  const inboxRelative=workspaceInboxRelative(config.workspace_root,stateDirectory);
  const inbox=new Inbox(inboxRelative,config.binding,{now});
  return {inbox,config,inboxRelative};
@@ -194,15 +217,51 @@ export function listLiveWorkspaces({stateDirectory=DEFAULT_LIVE_STATE}={}){
   if(!lstatSync(wsDir).isDirectory())continue;
   const bindingPath=scopedPath(wsDir,'inbox/binding.json');
   const targetPath=scopedPath(wsDir,'active-target.json');
+  const registrationPath=scopedPath(wsDir,'registration.json');
   let workspaceRoot=null;
   if(existsSync(bindingPath)){try{workspaceRoot=readBoundedJSON(bindingPath,4096).workspace_root;}catch{}}
   else if(existsSync(targetPath)){try{workspaceRoot=readBoundedJSON(targetPath,8192).workspace_root;}catch{}}
+  else if(existsSync(registrationPath)){try{workspaceRoot=readBoundedJSON(registrationPath,4096).workspace_root;}catch{}}
   if(workspaceRoot&&existsSync(workspaceRoot)){try{results.push(canonicalWorkspace(workspaceRoot));}catch{}}
  }
  return results;
 }
 
+export function defaultWorkspaceScopes(workspaceRoot){
+ const ws=canonicalWorkspace(workspaceRoot);
+ const scopes=[];
+ for(const name of readdirSync(ws).sort()){
+  if(EXCLUDED_ROOTS.includes(name.toLowerCase())||name==='.codex'||isSensitivePath(name))continue;
+  try{
+   validateScopePath(ws,name);
+   scopes.push(name);
+   if(scopes.length>=32)break;
+  }catch{}
+ }
+ return scopes.length?scopes:['README.md'];
+}
+
+export function resolveLatestWorkspaceTask(workspaceRoot,{stateDirectory=DEFAULT_LIVE_STATE,now=Date.now}={}){
+ const opened=existingLiveInbox(workspaceRoot,{stateDirectory,now});
+ if(!opened.inbox)throw Error('No jobs found (workspace inbox not initialized)');
+ const list=opened.inbox.list();
+ if(!list.length)throw Error('No jobs found in workspace inbox');
+ const isActiveSlot=record=>{
+  if(record.state==='VERIFIED'||record.outcome==='RELEASED')return false;
+  if(record.outcome==='UNCERTAIN_DELIVERY')return true;
+  if(record.outcome==='CANCELLED')return ['DISPATCHED','RESULT_READY'].includes(record.state);
+  return record.outcome!=='FAILED';
+ };
+ const activeList=list.filter(isActiveSlot);
+ const pool=activeList.length?activeList:list;
+ const latest=[...pool].sort((a,b)=>(Date.parse(b.job.created_at)||0)-(Date.parse(a.job.created_at)||0))[0];
+ return {...opened,record:latest};
+}
+
 export function findTaskAcrossWorkspaces(taskId,{workspaceRoot=null,stateDirectory=DEFAULT_LIVE_STATE,now=Date.now}={}){
+ if(!taskId&&workspaceRoot){
+  return resolveLatestWorkspaceTask(workspaceRoot,{stateDirectory,now});
+ }
  if(typeof taskId!=='string'||!UUID.test(taskId))throw Error('Invalid task_id');
  if(workspaceRoot){
   const opened=existingLiveInbox(workspaceRoot,{stateDirectory,now});
@@ -218,6 +277,18 @@ export function findTaskAcrossWorkspaces(taskId,{workspaceRoot=null,stateDirecto
  throw Error('Task not found in any live workspace inbox: '+taskId);
 }
 
+export function latestBriefPaths(inbox,stateDirectory=DEFAULT_LIVE_STATE){
+ const checked=checkedStateDirectory(stateDirectory);
+ return {
+  latest_brief_json_path:scopedPath(inbox.root,'latest-brief.json'),
+  latest_job_md_path:scopedPath(inbox.root,'LATEST-JOB.md'),
+  latest_summary_md_path:scopedPath(inbox.root,'LATEST-SUMMARY.md'),
+  global_latest_brief_json_path:scopedPath(ROOT,`${checked}/latest-brief.json`),
+  global_latest_job_md_path:scopedPath(ROOT,`${checked}/LATEST-JOB.md`),
+  global_latest_summary_md_path:scopedPath(ROOT,`${checked}/LATEST-SUMMARY.md`)
+ };
+}
+
 export function jobPaths(inbox,job){
  const taskDir=scopedPath(inbox.root,`tasks/${job.task_id}`);
  const outputDirectory=scopedPath(inbox.root,`tasks/${job.task_id}/output-${job.attempt_id}`);
@@ -225,6 +296,9 @@ export function jobPaths(inbox,job){
   task_directory:taskDir,
   brief_json_path:scopedPath(inbox.root,`tasks/${job.task_id}/brief-${job.attempt_id}.json`),
   brief_md_path:scopedPath(inbox.root,`tasks/${job.task_id}/brief-${job.attempt_id}.md`),
+  latest_brief_json_path:scopedPath(inbox.root,'latest-brief.json'),
+  latest_job_md_path:scopedPath(inbox.root,'LATEST-JOB.md'),
+  latest_summary_md_path:scopedPath(inbox.root,'LATEST-SUMMARY.md'),
   output_directory:outputDirectory,
   result_path:resolve(outputDirectory,'result.md'),
   report_path:resolve(outputDirectory,'report.json'),
@@ -232,8 +306,9 @@ export function jobPaths(inbox,job){
  };
 }
 
-export function writeJobBrief(inbox,job,{subtaskPlan=null}={}){
+export function writeJobBrief(inbox,job,{subtaskPlan=null,stateDirectory=DEFAULT_LIVE_STATE}={}){
  const paths=jobPaths(inbox,job);
+ const latestPaths=latestBriefPaths(inbox,stateDirectory);
  if(!subtaskPlan&&existsSync(paths.brief_json_path)){
   try{subtaskPlan=readBoundedJSON(paths.brief_json_path,65536)?.subtask_plan??null;}catch{}
  }
@@ -248,9 +323,23 @@ export function writeJobBrief(inbox,job,{subtaskPlan=null}={}){
   report_cli:reportCliPosix
  };
  atomicWriteJSON(paths.brief_json_path,briefPayload);
+ atomicWriteJSON(latestPaths.latest_brief_json_path,briefPayload);
+ try{atomicWriteJSON(latestPaths.global_latest_brief_json_path,briefPayload);}catch{}
  const modeLabel=job.write_scope.length?'WRITE-SCOPED (được phép sửa trong write_scope)':'READ-ONLY (chỉ đọc, tuyệt đối không sửa file trong workspace)';
  const writeLines=job.write_scope.length?job.write_scope.map(p=>`- \`${p}\``).join('\n'):'- *(Trống — nhiệm vụ chỉ đọc)*';
- const subtaskMd=subtaskPlan?['',renderSubtaskPlanMarkdown(subtaskPlan).trimEnd()]:[];
+ const autoSubagentLines=[
+  '',
+  '## 1.5. Điều phối Subagent Tự động (Auto-Subagent Protocol — Không đợi nhắc)',
+  '- **1 file / sửa nhỏ cục bộ:** Tự làm **DIRECT** ngay, đọc theo `StartLine..EndLine` từ Surgical Map.',
+  '- **Khảo sát rộng (>= 2 vùng độc lập):** Tự động gọi song song `invoke_subagent({ TypeName: "research", ... })` ngay lượt đầu.',
+  '- **Từ >= 2 phần việc hoặc >= 2 file/module độc lập:** Tự đóng vai **Team Lead**, tách `write_scope` không trùng nhau và gọi song song `invoke_subagent({ TypeName: "self", Workspace: "inherit", ... })`.'
+ ];
+ const subtaskMd=subtaskPlan?['',renderSubtaskPlanMarkdown(subtaskPlan).trimEnd()]:autoSubagentLines;
+ let surgicalMapMd=[];
+ try{
+  const mapText=renderSurgicalMapMarkdown(buildSurgicalSymbolMap(job.workspace_root,[...job.write_scope,...job.read_scope]));
+  if(mapText)surgicalMapMd=['',mapText];
+ }catch{}
  const md=[
   `# Codex Boss Job Brief — \`${job.task_id}\``,
   '',
@@ -272,8 +361,7 @@ export function writeJobBrief(inbox,job,{subtaskPlan=null}={}){
   '',
   '### Write Scope (`write_scope`)',
   writeLines,
-  '',
-  '> Không đọc/ghi ngoài danh sách trên. Không sửa `.codex/`, `.gemini/`, không commit/push trừ khi được yêu cầu rõ, không tự ghi nhận trạng thái `VERIFIED` (Codex Boss sẽ tự verify độc lập).',
+  ...surgicalMapMd,
   '',
   '## 3. Tiêu chí nghiệm thu (`acceptance_criteria`) & Checks (`verification_commands`)',
   '',
@@ -281,20 +369,23 @@ export function writeJobBrief(inbox,job,{subtaskPlan=null}={}){
   '',
   `- **Registered Host Checks:** ${job.verification_commands.map(c=>`\`${c}\``).join(', ')}`,
   '',
-  '## 4. Lệnh tự kiểm chứng song song & nộp báo cáo về Codex Boss (BẮT BUỘC)',
+  '## 4. Lệnh ghi Summary ngắn gọn báo về Codex Boss (BẮT BUỘC)',
   '',
-  'Sau khi hoàn thành công việc, chạy **1 lệnh duy nhất** dưới đây (`--run-checks` sẽ chạy song song các check ngay tại local trước khi nộp để tránh phải rework):',
+  'Khi làm xong, chỉ cần chạy **1 lệnh ngắn gọn** dưới đây để ghi Summary cho Codex đọc ngay (không cần truyền ID):',
   '',
   '```powershell',
-  `node "${reportCliPosix}" --brief "${briefJsonPosix}" --run-checks --status reported --summary "<tóm tắt kết quả ngắn gọn>" --inspected "${job.read_scope[0]}" --finding "<phát hiện hoặc thay đổi chính>" --evidence "<bằng chứng cụ thể: file/line/test/hash>"`,
+  `node "${reportCliPosix}" --latest --run-checks --summary "<tóm tắt ngắn gọn: đã sửa gì, ở file nào, kết quả test>"`,
   '```',
   '',
-  '- Nếu có chạy thêm test khác, thêm `--test "<lệnh>::<exit_code>::<output_ngắn>"` (có thể lặp lại nhiều cờ `--finding`, `--evidence`, `--test`).',
-  '- Nếu bị chặn bởi điều kiện thiếu, đổi `--status blocked` (bỏ `--run-checks`) và thêm `--blocker "<lý do>"`.',
-  '- Nếu gặp lỗi thực thi, đổi `--status failed` (bỏ `--run-checks`) và thêm `--error "<lỗi>"`.',
+  '*(Hoặc lệnh đầy đủ tương thích ngược:)*',
+  '```powershell',
+  `node "${reportCliPosix}" --brief "${briefJsonPosix}" --run-checks --status reported --summary "<tóm tắt kết quả ngắn gọn>"`,
+  '```',
   ''
  ].join('\n');
  atomicWriteText(paths.brief_md_path,md);
+ atomicWriteText(latestPaths.latest_job_md_path,md);
+ try{atomicWriteText(latestPaths.global_latest_job_md_path,md);}catch{}
  return paths;
 }
 
@@ -307,7 +398,7 @@ export function buildSingleLineTrigger(job,briefMdPath,{subtaskPlan=null}={}){
  const mode=job.write_scope.length?'WRITE':'READ';
  const swarmTag=subtaskPlan?` | SWARM ${subtaskPlan.total_subtasks}x/W${subtaskPlan.waves.length}`:'';
  const cleanGoal=String(job.goal).replace(/[\r\n\t]+/g,' ').replace(/\s+/g,' ').trim().slice(0,200);
- const trigger=`[Codex Boss Job ${job.task_id.slice(0,8)} | ${mode}${swarmTag}] Đọc và thực hiện đúng brief tại ${briefPosix} — Yêu cầu: ${cleanGoal}. Khi hoàn tất, chạy lệnh report-cli --run-checks trong brief để nộp báo cáo cho Codex.`.replace(/[\r\n\t\x00-\x1f]+/g,' ').trim();
+ const trigger=`[Codex Boss Job ${job.task_id.slice(0,8)} | ${mode}${swarmTag}] Đọc và thực hiện đúng brief tại ${briefPosix} — Yêu cầu: ${cleanGoal}. Tự động chia việc gọi invoke_subagent song song nếu có >=2 phần độc lập; khi hoàn tất, chạy lệnh report-cli --run-checks trong brief để nộp Summary cho Codex.`.replace(/[\r\n\t\x00-\x1f]+/g,' ').trim();
  if(/[\r\n\0]/.test(trigger)||!trigger.length)throw Error('Single-line trigger invariant violated');
  return trigger;
 }

@@ -323,7 +323,7 @@ test('wave-parallel subtasks enforce disjoint write scopes, survive sidecar disp
    read_scope:['README.md','src/moduleA.mjs','src/moduleB.mjs'],
    write_scope:['src/moduleA.mjs','src/moduleB.mjs'],
    subtasks:[
-    {id:'scan-readme',title:'Scan Architecture',agent_type:'research',wave:1,read_scope:['README.md'],goal:'Confirm module conventions'},
+    {id:'scan-readme',title:'Scan Architecture',agent_type:'research',wave:2,read_scope:['README.md'],goal:'Confirm module conventions'},
     {id:'impl-a',title:'Implement Module A',agent_type:'implementer',wave:1,read_scope:['src/moduleA.mjs'],write_scope:['src/moduleA.mjs'],goal:'Set a = 2'},
     {id:'impl-b',title:'Implement Module B',agent_type:'implementer',wave:1,read_scope:['src/moduleB.mjs'],write_scope:['src/moduleB.mjs'],goal:'Set b = 2'},
     {id:'review-ab',title:'Cross-check A & B',agent_type:'reviewer',wave:2,read_scope:['src/moduleA.mjs','src/moduleB.mjs'],goal:'Verify exports match'}
@@ -332,7 +332,7 @@ test('wave-parallel subtasks enforce disjoint write scopes, survive sidecar disp
    verification_commands:['verify-ab']
   });
   assert.equal(submitted.subtask_plan.total_subtasks,4);
-  assert.equal(submitted.subtask_plan.max_parallelism,3);
+  assert.equal(submitted.subtask_plan.max_parallelism,2);
   assert.match(submitted.single_line_trigger,/SWARM 4x\/W2/);
 
   const agentCalls=[];
@@ -458,7 +458,7 @@ test('ANTIGRAVITY_AGENTAPI_EXE sidecar transport resolves agentapi subcommand an
   assert.equal(tick.actions.length,1);
   assert.equal(tick.actions[0].action,'DISPATCHED');
   assert.equal(tick.heartbeat.agentapi_available,true);
-  assert.equal(tick.heartbeat.code_version,'2.5.1');
+  assert.equal(tick.heartbeat.code_version,'2.6.0');
 
   const jobStatus=await h.callTool('get_job_status',{task_id:submitted.task_id});
   assert.equal(jobStatus.state,'DISPATCHED');
@@ -469,7 +469,7 @@ test('ANTIGRAVITY_AGENTAPI_EXE sidecar transport resolves agentapi subcommand an
   const bridgeStatus=await h.callTool('bridge_status',{});
   assert.equal(bridgeStatus.sidecar_running,true);
   assert.equal(bridgeStatus.sidecar_agentapi_available,true);
-  assert.equal(bridgeStatus.sidecar_code_version,'2.5.1');
+  assert.equal(bridgeStatus.sidecar_code_version,'2.6.0');
  }finally{
   h.close();
  }

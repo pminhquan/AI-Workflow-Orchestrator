@@ -1,11 +1,12 @@
 import {existsSync,lstatSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {scopedPath,sha256} from '../core/util.mjs';
+import {ROOT,scopedPath,sha256} from '../core/util.mjs';
 import {CheckRunner,changedFiles,verifyScope} from '../verification/checks.mjs';
 import {validateReport} from './contracts.mjs';
-import {captureWorkspace,readBoundedBytes} from './verification.mjs';
-import {DEFAULT_LIVE_STATE,atomicWriteJSON,atomicWriteText,collectWorkerReport,openLiveInbox,readBoundedJSON,resolveWorkspaceConfig} from './live-bridge.mjs';
+import {readBoundedBytes} from './verification.mjs';
+import {captureWorkspaceFast} from './fast-snapshot.mjs';
+import {DEFAULT_LIVE_STATE,atomicWriteJSON,atomicWriteText,checkedStateDirectory,collectWorkerReport,existingLiveInbox,latestBriefPaths,openLiveInbox,readBoundedJSON,resolveWorkspaceConfig} from './live-bridge.mjs';
 
 function splitList(values){
  const out=[];
@@ -51,8 +52,7 @@ function autoEvidence(job,inspectedFiles,actualChanged){
   try{
    const full=scopedPath(job.workspace_root,rel);
    if(existsSync(full)&&lstatSync(full).isFile()){
-    const digest=sha256(readBoundedBytes(full,4*1024*1024));
-    items.push(`${rel} (sha256:${digest})`);
+    items.push(`${rel} (${actualChanged.includes(rel)?'modified':'inspected'})`);
    }else if(!existsSync(full)&&actualChanged.includes(rel)){
     items.push(`${rel} (deleted)`);
    }
@@ -61,14 +61,41 @@ function autoEvidence(job,inspectedFiles,actualChanged){
  return items;
 }
 
-export function submitWorkerReport({briefPath,status='reported',summary='',inspected=[],changed=null,findings=[],evidence=[],blockers=[],errors=[],tests=[],stateDirectory=DEFAULT_LIVE_STATE}={}){
- if(!briefPath)throw Error('Missing required --brief <brief.json>');
- const brief=readBoundedJSON(resolve(briefPath),65536);
+export function resolveBriefInput({briefPath=null,workspaceRoot=null,stateDirectory=DEFAULT_LIVE_STATE}={}){
+ if(briefPath)return resolve(briefPath);
+ const checked=checkedStateDirectory(stateDirectory);
+ if(workspaceRoot){
+  const opened=existingLiveInbox(workspaceRoot,{stateDirectory:checked});
+  if(opened.inbox){
+   const wsLatest=scopedPath(opened.inbox.root,'latest-brief.json');
+   if(existsSync(wsLatest))return wsLatest;
+  }
+ }
+ const globalLatest=scopedPath(ROOT,`${checked}/latest-brief.json`);
+ if(existsSync(globalLatest))return globalLatest;
+ throw Error('Missing brief: pass --brief <brief.json> or submit a job first so latest-brief.json exists');
+}
+
+export function submitWorkerReport({briefPath=null,workspaceRoot=null,status='reported',summary='',inspected=[],changed=null,findings=[],evidence=[],blockers=[],errors=[],tests=[],stateDirectory=DEFAULT_LIVE_STATE,now=Date.now}={}){
+ const resolvedBriefPath=resolveBriefInput({briefPath,workspaceRoot,stateDirectory});
+ const brief=readBoundedJSON(resolvedBriefPath,65536);
  if(brief?.format!=='desktop-inbox.brief@1'||!brief?.job?.task_id)throw Error('Invalid brief JSON format');
  const job=brief.job;
- const {inbox}=openLiveInbox(job.workspace_root,{stateDirectory});
- const record=inbox.get(job.task_id);
- const currentSnapshot=captureWorkspace(job.workspace_root);
+ const {inbox}=openLiveInbox(job.workspace_root,{stateDirectory,now});
+ let record=inbox.get(job.task_id);
+ if(record.state==='PENDING'&&record.outcome===null){
+  const claimed=inbox.claim(job.task_id);
+  inbox.beginDispatch(job.task_id,claimed.claim_id);
+  record=inbox.recordDelivery(job.task_id,claimed.claim_id,{
+   kind:'DIRECT_FILE_HANDOFF',
+   mode:'latest-job-file',
+   delivery_confirmed:false,
+   started:true,
+   exit_code:0,
+   dispatched_at:new Date(now()).toISOString()
+  });
+ }
+ const currentSnapshot=captureWorkspaceFast(job.workspace_root);
  const actualChanged=changedFiles(record.baseline,currentSnapshot);
  const changedList=changed===null?actualChanged:splitList(changed);
  if(status==='reported'){
@@ -81,6 +108,7 @@ export function submitWorkerReport({briefPath,status='reported',summary='',inspe
  const evidenceList=[...evidence.map(String).map(s=>s.trim()).filter(Boolean)];
  if(!evidenceList.length&&status==='reported')evidenceList.push(...autoEvidence(job,inspectedList,changedList));
  if(!evidenceList.length&&summary.trim())evidenceList.push(summary.trim());
+ if(!evidenceList.length)evidenceList.push(findingsList[0]);
  const report={
   schema_version:'desktop-inbox.report@1',
   task_id:job.task_id,
@@ -102,6 +130,7 @@ export function submitWorkerReport({briefPath,status='reported',summary='',inspe
   `- **Attempt ID:** \`${job.attempt_id}\``,
   `- **Workspace:** \`${job.workspace_root}\``,
   `- **Status:** \`${validated.status}\``,
+  ...(job.verification_commands.every(id=>id==='noop')?['- **Parent registered functional checks:** NOT RUN (noop only); additional worker tests are listed below.']:[]),
   '',
   '## Summary & Findings',
   ...validated.findings.map(item=>`- ${item}`),
@@ -119,6 +148,9 @@ export function submitWorkerReport({briefPath,status='reported',summary='',inspe
   ''
  ].join('\n');
  atomicWriteText(brief.paths.result_path,resultMd);
+ const latestPaths=latestBriefPaths(inbox,stateDirectory);
+ atomicWriteText(latestPaths.latest_summary_md_path,resultMd);
+ try{atomicWriteText(latestPaths.global_latest_summary_md_path,resultMd);}catch{}
  atomicWriteJSON(brief.paths.report_path,validated);
  if(!existsSync(brief.paths.collected_report_path)){
   atomicWriteJSON(brief.paths.collected_report_path,validated,{exclusive:true});
@@ -132,13 +164,15 @@ export function submitWorkerReport({briefPath,status='reported',summary='',inspe
   changed_files:validated.changed_files,
   result_path:brief.paths.result_path,
   report_path:brief.paths.report_path,
-  collected_report_path:brief.paths.collected_report_path
+  collected_report_path:brief.paths.collected_report_path,
+  latest_summary_md_path:latestPaths.latest_summary_md_path,
+  functional_tests:job.verification_commands.every(id=>id==='noop')?'NOT_RUN':'SEE_CHECK_RESULTS'
  };
 }
 
-export async function runPreReportChecks(briefPath,{stateDirectory=DEFAULT_LIVE_STATE}={}){
- if(!briefPath)throw Error('Missing required --brief <brief.json>');
- const brief=readBoundedJSON(resolve(briefPath),65536);
+export async function runPreReportChecks(briefPath=null,{workspaceRoot=null,stateDirectory=DEFAULT_LIVE_STATE}={}){
+ const resolvedBriefPath=resolveBriefInput({briefPath,workspaceRoot,stateDirectory});
+ const brief=readBoundedJSON(resolvedBriefPath,65536);
  if(brief?.format!=='desktop-inbox.brief@1'||!brief?.job)throw Error('Invalid brief JSON format');
  const config=resolveWorkspaceConfig(brief.job.workspace_root,{stateDirectory});
  const runner=new CheckRunner(config.checks);
@@ -158,10 +192,12 @@ export async function runPreReportChecks(briefPath,{stateDirectory=DEFAULT_LIVE_
 }
 
 export async function main(args=process.argv.slice(2)){
- const opts={briefPath:null,status:'reported',summary:'',inspected:[],changed:null,findings:[],evidence:[],blockers:[],errors:[],tests:[],runChecks:false,stateDirectory:DEFAULT_LIVE_STATE};
+ const opts={briefPath:null,workspaceRoot:null,latest:false,status:'reported',summary:'',inspected:[],changed:null,findings:[],evidence:[],blockers:[],errors:[],tests:[],runChecks:false,stateDirectory:DEFAULT_LIVE_STATE};
  for(let i=0;i<args.length;i++){
   const flag=args[i],val=args[i+1];
   if(flag==='--brief'&&val)opts.briefPath=args[++i];
+  else if(flag==='--workspace'&&val)opts.workspaceRoot=args[++i];
+  else if(flag==='--latest')opts.latest=true;
   else if(flag==='--status'&&val)opts.status=args[++i];
   else if(flag==='--summary'&&val)opts.summary=args[++i];
   else if(flag==='--inspected'&&val)opts.inspected.push(args[++i]);
@@ -175,8 +211,9 @@ export async function main(args=process.argv.slice(2)){
   else if(flag==='--state'&&val)opts.stateDirectory=args[++i];
   else throw Error('Unknown or incomplete option: '+flag);
  }
+ opts.briefPath=resolveBriefInput({briefPath:opts.briefPath,workspaceRoot:opts.workspaceRoot,stateDirectory:opts.stateDirectory});
  if(opts.runChecks){
-  const precheck=await runPreReportChecks(opts.briefPath,{stateDirectory:opts.stateDirectory});
+  const precheck=await runPreReportChecks(opts.briefPath,{workspaceRoot:opts.workspaceRoot,stateDirectory:opts.stateDirectory});
   opts.tests.push(...precheck.formatted_tests);
   if(!precheck.all_passed&&opts.status==='reported'){
    throw Error('Pre-report verification checks failed; fix before reporting to Codex Boss: '+precheck.checks.filter(c=>!c.passed).map(c=>`${c.check_id} (exit ${c.exit_code}): ${c.output}`).join(' | '));

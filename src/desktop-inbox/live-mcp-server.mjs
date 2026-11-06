@@ -5,21 +5,27 @@ import {pathToFileURL} from 'node:url';
 import {ROOT,scopedPath,sha256} from '../core/util.mjs';
 import { validate } from '../core/schema.mjs';
 import {changedFiles} from '../verification/checks.mjs';
-import {UUID,MAX_JOB_BYTES,MAX_REPORT_BYTES,boundedJSON,makeJob,validateReport} from './contracts.mjs';
+import {UUID,MAX_JOB_BYTES,MAX_REPORT_BYTES,MAX_JOB_AGE_MS,boundedJSON,makeJob,validateReport} from './contracts.mjs';
 import {readBoundedBytes,verifyJob} from './verification.mjs';
 import {captureWorkspaceFast,getSnapshotCacheStats} from './fast-snapshot.mjs';
 import {SUBTASK_AGENT_TYPES,validateSubtaskPlan} from './subtask-planner.mjs';
 import {
  DEFAULT_LIVE_STATE,
+ defaultWorkspaceScopes,
+ ensureWorkspaceRegistration,
  buildSingleLineTrigger,
  checkedStateDirectory,
  collectWorkerReport,
  findTaskAcrossWorkspaces,
  jobPaths,
  openLiveInbox,
+ resolveLatestWorkspaceTask,
  writeJobBrief
 } from './live-bridge.mjs';
 import {inspectWorkspaceReadiness} from './readiness.mjs';
+import {resolveRequestWorkspace} from './workspace-context.mjs';
+import {suggestProjectChecks} from './project-checks.mjs';
+import {readSelectedReceiver,resolveEffectiveReceiver,selectVerifiedReceiver,selectedReadiness,bindSelectedReceiver} from './selected-receiver.mjs';
 
 const text={type:'string',minLength:1};
 const taskIdSchema={type:'string',pattern:UUID.source};
@@ -33,28 +39,30 @@ export const LIVE_MCP_TOOLS=[
   inputSchema:{
    type:'object',
    additionalProperties:false,
-   properties:{workspace_root:text}
+   properties:{workspace_root:text,use_selected_receiver:{type:'boolean'}}
   },
   annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false}
  },
  {
   name:'submit_job',
-  description:'Queue a bounded read-only or write-scoped task (with optional parallel wave subtasks) for Antigravity Desktop GUI. The live sidecar delivers a concise single-line trigger into the open GUI conversation.',
+  description:'Queue a task (with optional parallel wave subtasks) for Antigravity Desktop GUI. The live sidecar delivers a concise single-line trigger into the open GUI conversation and submits it automatically.',
   inputSchema:{
    type:'object',
    additionalProperties:false,
-   required:['request','read_scope','acceptance_criteria'],
+   required:['request'],
    properties:{
     task_id:taskIdSchema,
     attempt_id:taskIdSchema,
     workspace_root:text,
+    use_selected_receiver:{type:'boolean'},
+    replace_active:{type:'boolean'},
+    read_only:{type:'boolean'},
     request:text,
     read_scope:{...pathList,minItems:1},
     write_scope:pathList,
     subtasks:{
      type:'array',
      minItems:1,
-     maxItems:8,
      items:{
       type:'object',
       additionalProperties:false,
@@ -78,52 +86,51 @@ export const LIVE_MCP_TOOLS=[
  },
  {
   name:'wait_job',
-  description:'Event-driven wait until the Antigravity Worker submits its report (RESULT_READY), fails/releases, or timeout_sec elapses.',
+  description:'Event-driven wait until the Antigravity Worker submits its concise summary/report (RESULT_READY), fails/releases, or timeout_sec elapses. Omit task_id to wait on the latest workspace job; set auto_verify=true to verify and close in one step.',
   inputSchema:{
    type:'object',
    additionalProperties:false,
-   required:['task_id'],
    properties:{
     task_id:taskIdSchema,
     workspace_root:text,
-    timeout_sec:{type:'integer',minimum:1,maximum:110}
+    timeout_sec:{type:'integer',minimum:1,maximum:110},
+    auto_verify:{type:'boolean'}
    }
   },
   annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:true,openWorldHint:false}
  },
  {
   name:'get_job_status',
-  description:'Inspect durable job state, delivery receipt, and current workspace diff without waiting.',
+  description:'Inspect durable job state, delivery receipt, and current workspace diff without waiting. Omit task_id to inspect the latest workspace job.',
   inputSchema:{
    type:'object',
    additionalProperties:false,
-   required:['task_id'],
    properties:{task_id:taskIdSchema,workspace_root:text}
   },
   annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:true,openWorldHint:false}
  },
  {
   name:'get_job_result',
-  description:'Read the hash-verified worker report, result.md summary, and actual changed files in the workspace.',
+  description:'Read the concise worker summary, changed files, and test outcomes without reading full source files. Omit task_id to read the latest workspace job.',
   inputSchema:{
    type:'object',
    additionalProperties:false,
-   required:['task_id'],
-   properties:{task_id:taskIdSchema,workspace_root:text}
+   properties:{task_id:taskIdSchema,workspace_root:text,auto_verify:{type:'boolean'}}
   },
   annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:true,openWorldHint:false}
  },
  {
   name:'verify_job',
-  description:'Independently verify scope/diff, run fresh registered host checks, and mark VERIFIED (or set accepted=false to release for rework).',
+  description:'Independently verify scope/diff, run fresh registered host checks, and mark VERIFIED (or set accepted=false to release for rework). Omit task_id to verify the latest workspace job.',
   inputSchema:{
    type:'object',
    additionalProperties:false,
-   required:['task_id','accepted'],
+   required:['accepted'],
    properties:{
     task_id:taskIdSchema,
     workspace_root:text,
     accepted:{type:'boolean'},
+    select_receiver:{type:'boolean'},
     review_notes:{type:'array',maxItems:16,items:text}
    }
   },
@@ -131,11 +138,10 @@ export const LIVE_MCP_TOOLS=[
  },
  {
   name:'release_job',
-  description:'Explicitly release a blocked, failed, cancelled, or uncertain job so a new task or rework attempt can be submitted on the workspace.',
+  description:'Explicitly release a blocked, failed, cancelled, or uncertain job so a new task or rework attempt can be submitted on the workspace. Omit task_id to release the latest workspace job.',
   inputSchema:{
    type:'object',
    additionalProperties:false,
-   required:['task_id'],
    properties:{
     task_id:taskIdSchema,
     workspace_root:text,
@@ -160,9 +166,11 @@ function formatRecord(inbox,record){
   workspace_root:record.job.workspace_root,
   project_id:record.job.project_id,
   state:record.state,
+  handoff_status:record.outcome??(record.state==='PENDING'?'WAITING_FOR_RECEIVER':record.state==='RESULT_READY'?'REPORTED_AWAITING_PARENT':record.state==='DISPATCHED'&&record.delivery?.delivery_confirmed===false?'WAITING_FOR_USER_HANDOFF':record.state==='DISPATCHED'?'TRANSPORT_ATTEMPTED_AWAITING_REPORT':record.state),
   outcome:record.outcome,
   write_scope:record.job.write_scope,
   verification_commands:record.job.verification_commands,
+  functional_tests:record.job.verification_commands.every(id=>id==='noop')?'NOT_RUN':'SEE_CHECK_RESULTS',
   ...paths,
   delivery:record.delivery,
   report_sha256:record.report_sha256,
@@ -175,12 +183,22 @@ function formatRecord(inbox,record){
 function attachWorkerReport(inbox,record,formatted){
  const resultAvailable=['RESULT_READY','VERIFIED'].includes(record.state);
  formatted.result_available=resultAvailable;
+ formatted.concise_summary=null;
  formatted.worker_report=null;
  formatted.result_markdown=null;
  if(resultAvailable){
   const bytes=readBoundedBytes(scopedPath(inbox.root,record.job.expected_output),MAX_REPORT_BYTES);
   if(sha256(bytes)!==record.report_sha256)throw Error('Worker report changed after collection');
   formatted.worker_report=validateReport(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)),record.job);
+  formatted.concise_summary={
+   status:formatted.worker_report.status,
+   headline:formatted.worker_report.findings[0]??'',
+   findings:formatted.worker_report.findings,
+   changed_files:formatted.worker_report.changed_files,
+   tests:formatted.worker_report.tests.map(t=>`${t.command} (exit ${t.exit_code})`),
+   blockers:formatted.worker_report.blockers,
+   errors:formatted.worker_report.errors
+  };
   if(existsSync(formatted.result_path)){
    try{formatted.result_markdown=new TextDecoder('utf-8',{fatal:true}).decode(readBoundedBytes(formatted.result_path,MAX_REPORT_BYTES));}catch{}
   }
@@ -189,25 +207,31 @@ function attachWorkerReport(inbox,record,formatted){
 }
 
 export function createLiveToolHandler({
- defaultWorkspaceRoot=ROOT,
+ defaultWorkspaceRoot=null,
  stateDirectory=DEFAULT_LIVE_STATE,
  now=Date.now
 }={}){
  const checkedState=checkedStateDirectory(stateDirectory);
- return async function callTool(name,args={}){
+ return async function callTool(name,args={},context={}){
   const tool=LIVE_MCP_TOOLS.find(item=>item.name===name);
   if(!tool)throw Error('Unknown MCP tool: '+name);
   boundedJSON(args,MAX_JOB_BYTES,'Tool arguments');
   const checked=validate(args,tool.inputSchema);
   if(!checked.valid)throw Error('Invalid tool arguments: '+checked.errors.join('; '));
+  const workspaceContext=await resolveRequestWorkspace({requestedRoot:args.workspace_root,pinnedRoot:defaultWorkspaceRoot,getWorkspaceRoots:context.getWorkspaceRoots});
+  ensureWorkspaceRegistration(workspaceContext.root,{stateDirectory:checkedState});
 
   if(name==='bridge_status'){
-   const ws=args.workspace_root??defaultWorkspaceRoot;
-   const readiness=inspectWorkspaceReadiness({workspaceRoot:ws,stateDirectory:checkedState,now});
+   const ws=workspaceContext.root;
+   const selected=args.use_selected_receiver===false?null:readSelectedReceiver({stateDirectory:checkedState});
+   const readiness=selectedReadiness(inspectWorkspaceReadiness({workspaceRoot:ws,stateDirectory:checkedState,now}),selected);
    const {config}=readiness;
    return {
     workspace_root:config.workspace_root,
     project_id:config.slug,
+    workspace_context:workspaceContext,
+    project_checks:suggestProjectChecks(config.workspace_root),
+    delivery_target:readiness.delivery_target??{mode:'matching_workspace',proves_gui_focus:false},
     available_checks:Object.keys(config.checks),
     allow_new_conversation:config.allow_new_conversation,
     active_gui_target:readiness.active_gui_target,
@@ -231,7 +255,7 @@ export function createLiveToolHandler({
   }
 
   if(name==='submit_job'){
-   const ws=args.workspace_root??defaultWorkspaceRoot;
+   const ws=workspaceContext.root;
    const {inbox,config}=openLiveInbox(ws,{stateDirectory:checkedState,now});
    const verificationCommands=args.verification_commands?.length?args.verification_commands:['noop'];
    for(const checkId of verificationCommands){
@@ -239,70 +263,100 @@ export function createLiveToolHandler({
      throw Error(`Unknown verification check "${checkId}" for workspace ${config.workspace_root}. Available checks: ${Object.keys(config.checks).join(', ')}`);
     }
    }
-   const writeScope=args.write_scope??[];
+   const zeroCeremony=!args.read_scope?.length;
+   const defaultScopes=zeroCeremony?defaultWorkspaceScopes(config.workspace_root):null;
+   const writeScope=args.write_scope!==undefined?args.write_scope:(zeroCeremony?(args.read_only?[]:defaultScopes):[]);
+   const readScope=args.read_scope?.length?args.read_scope:[...new Set([...defaultScopes,...writeScope])].slice(0,32);
+   const acceptanceCriteria=args.acceptance_criteria?.length?args.acceptance_criteria:['Complete requested task and provide concise summary'];
    const subtaskPlan=args.subtasks?.length
-    ?validateSubtaskPlan(args.subtasks,{readScope:args.read_scope,writeScope,workspaceRoot:config.workspace_root})
+    ?validateSubtaskPlan(args.subtasks,{readScope,writeScope,workspaceRoot:config.workspace_root})
     :null;
+   const forceReplace=args.replace_active===true||(zeroCeremony&&args.replace_active!==false);
+   for(const existing of inbox.list()){
+    if(existing.state==='VERIFIED'||existing.outcome==='RELEASED'||existing.outcome==='FAILED')continue;
+    if(existing.outcome==='CANCELLED'&&['PENDING','CLAIMED'].includes(existing.state))continue;
+    const ageMs=now()-Date.parse(existing.job.created_at);
+    if(forceReplace||ageMs>MAX_JOB_AGE_MS){
+     try{inbox.release(existing.job.task_id,forceReplace?'Auto-released previous task on new submit_job':'Auto-released expired task (>10m)');}catch{}
+    }
+   }
    const job=makeJob(config.binding,{
     task_id:args.task_id??randomUUID(),
     attempt_id:args.attempt_id??randomUUID(),
     workspace_root:config.workspace_root,
     goal:args.request,
-    read_scope:args.read_scope,
+    read_scope:readScope,
     write_scope:writeScope,
-    acceptance_criteria:args.acceptance_criteria,
+    acceptance_criteria:acceptanceCriteria,
     verification_commands:verificationCommands
    },{now});
    const baseline=captureWorkspaceFast(config.workspace_root);
-   const record=inbox.submit(job,{baseline});
-   const paths=writeJobBrief(inbox,job,{subtaskPlan});
-   const trigger=buildSingleLineTrigger(job,paths.brief_md_path,{subtaskPlan});
-   const readiness=inspectWorkspaceReadiness({
+   const rawReadiness=inspectWorkspaceReadiness({
     workspaceRoot:config.workspace_root,
     stateDirectory:checkedState,
     records:[],
     now
    });
-   const targetConversationId=readiness.target_observation.bound&&readiness.target_observation.fresh
+   const selected=args.use_selected_receiver===false?null:readSelectedReceiver({stateDirectory:checkedState});
+   const effectiveSelected=resolveEffectiveReceiver(rawReadiness,selected);
+   if(effectiveSelected)bindSelectedReceiver(inbox,job,effectiveSelected);
+   const record=inbox.submit(job,{baseline});
+   const paths=writeJobBrief(inbox,job,{subtaskPlan,stateDirectory:checkedState});
+   const trigger=buildSingleLineTrigger(job,paths.brief_md_path,{subtaskPlan});
+   const readiness=selectedReadiness(rawReadiness,effectiveSelected);
+   const targetConversationId=effectiveSelected?.conversation_id??(readiness.target_observation.bound&&readiness.target_observation.fresh
     ?readiness.target_observation.conversation_id
-    :null;
+    :null);
    return {
     ...formatRecord(inbox,record),
     subtask_plan:subtaskPlan,
     single_line_trigger:trigger,
     target_conversation_id:targetConversationId,
+    delivery_target:readiness.delivery_target??{mode:'matching_workspace',proves_gui_focus:false},
     sidecar_running:readiness.sidecar_running,
     ready_to_dispatch:readiness.ready_to_dispatch,
     readiness_status:readiness.readiness_status,
     reason_codes:readiness.reason_codes,
     next_step:targetConversationId
-     ?(readiness.ready_to_dispatch?'Call wait_job to await Antigravity GUI completion, then verify_job.':'Enable "AWO Desktop Bridge" in Antigravity Automations Dashboard (or paste single_line_trigger into GUI), then call wait_job.')
+     ?(readiness.ready_to_dispatch?'Call wait_job({ workspace_root, auto_verify: true }) to await Antigravity GUI completion and read concise_summary.':'Enable "AWO Desktop Bridge" in Antigravity Automations Dashboard (or paste single_line_trigger into GUI), then call wait_job.')
      :'Open a chat in Antigravity Desktop GUI for this workspace so the Hook Beacon captures conversationId, then Sidecar will auto-deliver.'
    };
   }
 
-  const found=findTaskAcrossWorkspaces(args.task_id,{workspaceRoot:args.workspace_root??null,stateDirectory:checkedState,now});
+  const found=args.task_id
+   ?findTaskAcrossWorkspaces(args.task_id,{workspaceRoot:workspaceContext.root,stateDirectory:checkedState,now})
+   :resolveLatestWorkspaceTask(workspaceContext.root,{stateDirectory:checkedState,now});
+  const taskId=found.record.job.task_id;
   const {inbox,config}=openLiveInbox(found.config.workspace_root,{stateDirectory:checkedState,now});
 
   if(name==='release_job'){
-   const released=inbox.release(args.task_id,args.reason??'Released by Codex Boss via MCP');
+   const released=inbox.release(taskId,args.reason??'Released by Codex Boss via MCP');
    return {released:true,...formatRecord(inbox,released)};
   }
 
   if(name==='get_job_status'){
-   const record=collectWorkerReport(inbox,args.task_id);
+   const record=collectWorkerReport(inbox,taskId);
    return formatRecord(inbox,record);
   }
 
   if(name==='get_job_result'){
-   const record=collectWorkerReport(inbox,args.task_id);
+   let record=collectWorkerReport(inbox,taskId);
+   if(args.auto_verify&&record.state==='RESULT_READY'&&!['CANCELLED','RELEASED'].includes(record.outcome)){
+    try{
+     record=await verifyJob(inbox,taskId,{
+      checks:config.checks,
+      snapshot:captureWorkspaceFast,
+      review:async()=>({accepted:true,notes:['Auto-verified on get_job_result']})
+     });
+    }catch{}
+   }
    return attachWorkerReport(inbox,record,formatRecord(inbox,record));
   }
 
   if(name==='wait_job'){
    const timeoutMs=(args.timeout_sec??75)*1000;
    const deadline=Date.now()+timeoutMs;
-   const taskDir=scopedPath(inbox.root,`tasks/${args.task_id}`);
+   const taskDir=scopedPath(inbox.root,`tasks/${taskId}`);
    let watcher=null,wake=null;
    try{
     if(existsSync(taskDir)){
@@ -310,8 +364,17 @@ export function createLiveToolHandler({
      watcher.on('error',()=>{});
     }
     while(true){
-     const record=collectWorkerReport(inbox,args.task_id);
+     let record=collectWorkerReport(inbox,taskId);
      if(['RESULT_READY','VERIFIED'].includes(record.state)||record.outcome!==null){
+      if(args.auto_verify&&record.state==='RESULT_READY'&&!['CANCELLED','RELEASED'].includes(record.outcome)){
+       try{
+        record=await verifyJob(inbox,taskId,{
+         checks:config.checks,
+         snapshot:captureWorkspaceFast,
+         review:async()=>({accepted:true,notes:['Auto-verified on wait_job completion']})
+        });
+       }catch{}
+      }
       return {timed_out:false,...attachWorkerReport(inbox,record,formatRecord(inbox,record))};
      }
      const remaining=deadline-Date.now();
@@ -330,19 +393,22 @@ export function createLiveToolHandler({
   }
 
   if(name==='verify_job'){
-   const current=collectWorkerReport(inbox,args.task_id);
+   const current=collectWorkerReport(inbox,taskId);
    if(!args.accepted){
     const reason='Rejected by Codex Boss for rework'+(args.review_notes?.length?': '+args.review_notes.join('; '):'');
-    const released=inbox.release(args.task_id,reason);
+    const released=inbox.release(taskId,reason);
     return {verified:false,released:true,...formatRecord(inbox,released)};
    }
    if(current.state!=='RESULT_READY'){
-    throw Error(`Task ${args.task_id} is in state ${current.state} (outcome=${current.outcome}); wait for RESULT_READY before verify_job.`);
+    throw Error(`Task ${taskId} is in state ${current.state} (outcome=${current.outcome}); wait for RESULT_READY before verify_job.`);
    }
-   const verified=await verifyJob(inbox,args.task_id,{
+   if(args.select_receiver&&(current.delivery?.kind!=='ANTIGRAVITY_AGENTAPI'||current.delivery?.started!==true||current.delivery?.exit_code!==0))throw Error('Select a recipient only from a real successful automatic delivery');
+   const verified=await verifyJob(inbox,taskId,{
     checks:config.checks,
+    snapshot:captureWorkspaceFast,
     review:async()=>({accepted:true,notes:args.review_notes??[]})
    });
+   if(args.select_receiver)selectVerifiedReceiver(verified,{stateDirectory:checkedState,now});
    return {verified:true,released:false,...attachWorkerReport(inbox,verified,formatRecord(inbox,verified))};
   }
 
@@ -357,7 +423,18 @@ function rpcError(id,code,message){return {jsonrpc:'2.0',id,error:{code,message}
 export function startLiveStdioServer({input=process.stdin,output=process.stdout,callTool}={}){
  if(typeof callTool!=='function')throw Error('Tool handler required');
  let phase='NEW',pending=Buffer.alloc(0),closed=false,queue=Promise.resolve();
+ let rootsSupported=false,requestSequence=0;
+ const replies=new Map();
  const send=value=>{if(!closed)output.write(JSON.stringify(value)+'\n');};
+ const getWorkspaceRoots=()=>{
+  if(!rootsSupported)return Promise.resolve(null);
+  return new Promise((accept,reject)=>{
+   const id=`awo-roots-${++requestSequence}`;
+   const timer=setTimeout(()=>{replies.delete(id);reject(Error('WORKSPACE_CONTEXT_UNAVAILABLE: client roots/list timed out'));},2000);
+   replies.set(id,message=>{clearTimeout(timer);replies.delete(id);if(message.error||!Array.isArray(message.result?.roots))reject(Error('WORKSPACE_CONTEXT_UNAVAILABLE: invalid client roots/list response'));else accept(message.result.roots);});
+   send({jsonrpc:'2.0',id,method:'roots/list',params:{}});
+  });
+ };
  async function handleLine(line){
   let message;
   try{message=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(line));}
@@ -377,6 +454,7 @@ export function startLiveStdioServer({input=process.stdin,output=process.stdout,
     send(rpcError(id,-32602,'Invalid initialize params'));return;
    }
    const protocolVersion=SUPPORTED_VERSIONS.includes(params.protocolVersion)?params.protocolVersion:SUPPORTED_VERSIONS[0];
+   rootsSupported=Boolean(params.capabilities.roots&&typeof params.capabilities.roots==='object');
    phase='INITIALIZING';
    send({
     jsonrpc:'2.0',
@@ -384,8 +462,8 @@ export function startLiveStdioServer({input=process.stdin,output=process.stdout,
     result:{
      protocolVersion,
      capabilities:{tools:{listChanged:false}},
-     serverInfo:{name:'awo-live-desktop-bridge',version:'2.5.1'},
-     instructions:'Codex Boss -> Antigravity Desktop GUI bridge. Check bridge_status, submit_job with bounded scopes, wait_job, inspect get_job_result, and verify_job.'
+     serverInfo:{name:'awo-live-desktop-bridge',version:'2.6.0'},
+     instructions:'Codex Boss -> Antigravity Desktop GUI bridge. Pass workspace_root from the current session environment on EVERY call when client MCP roots are unavailable. Never infer a root from server cwd. Check bridge_status, submit a scoped job, wait, inspect results and independently verify.'
     }
    });
    return;
@@ -401,7 +479,7 @@ export function startLiveStdioServer({input=process.stdin,output=process.stdout,
     send(rpcError(id,-32602,'Unknown tool'));return;
    }
    try{
-    const result=await callTool(params.name,params.arguments??{});
+    const result=await callTool(params.name,params.arguments??{},{getWorkspaceRoots});
     send({jsonrpc:'2.0',id,result:{content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result,isError:false}});
    }catch(error){
     send({jsonrpc:'2.0',id,result:{content:[{type:'text',text:error.message}],isError:true}});
@@ -418,7 +496,13 @@ export function startLiveStdioServer({input=process.stdin,output=process.stdout,
    const line=pending.subarray(0,at).subarray(0,at>0&&pending[at-1]===13?at-1:at);
    pending=pending.subarray(at+1);
    if(line.length>MAX_MESSAGE_BYTES){send(rpcError(null,-32600,'Message too large'));closed=true;input.destroy();return;}
-   if(line.length)queue=queue.then(()=>handleLine(line)).catch(()=>{});
+   if(line.length){
+    // Responses to server->client roots requests must bypass the serialized
+    // tool queue, which is currently awaiting that response.
+    let response;try{response=JSON.parse(line.toString('utf8'));}catch{}
+    if(response?.jsonrpc==='2.0'&&!Object.hasOwn(response,'method')&&replies.has(response.id))replies.get(response.id)(response);
+    else queue=queue.then(()=>handleLine(line)).catch(()=>{});
+   }
   }
   if(pending.length>MAX_MESSAGE_BYTES){send(rpcError(null,-32600,'Message too large'));closed=true;input.destroy();}
  });
@@ -429,7 +513,7 @@ export function startLiveStdioServer({input=process.stdin,output=process.stdout,
 if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url){
  try{
   const args=process.argv.slice(2);
-  let defaultWorkspaceRoot=process.cwd(),stateDirectory=DEFAULT_LIVE_STATE;
+  let defaultWorkspaceRoot=null,stateDirectory=DEFAULT_LIVE_STATE;
   for(let i=0;i<args.length;i+=2){
    if(!args[i+1])throw Error('Expected --workspace <path> [--state <state/dir>]');
    if(args[i]==='--workspace')defaultWorkspaceRoot=args[i+1];

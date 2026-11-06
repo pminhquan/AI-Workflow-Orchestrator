@@ -22,7 +22,7 @@ export function noKnownSecrets(value){
  // Detection is deliberately bounded; callers must also review inputs for arbitrary secrets.
 }
 export function canonicalWorkspace(root){
- if(typeof root!=='string'||!isAbsolute(root)||/(?:^|[\\/])\.{1,2}(?:[\\/]|$)/.test(root)||root.startsWith('\\\\')||root.startsWith('//'))throw Error('Workspace must be an absolute canonical local directory');
+ if(typeof root!=='string'||root!==root.trim()||/[\x00-\x1f\x7f]/.test(root)||!isAbsolute(root)||/(?:^|[\\/])\.{1,2}(?:[\\/]|$)/.test(root)||root.startsWith('\\\\')||root.startsWith('//'))throw Error('Workspace must be an absolute canonical local directory');
  const resolved=resolve(root),actual=realpathSync(root);
  const normalized=value=>process.platform==='win32'?value.toLowerCase():value;
  if(normalized(resolved)!==normalized(actual)||!lstatSync(actual).isDirectory()||lstatSync(resolved).isSymbolicLink())throw Error('Workspace aliases/links are unsupported');

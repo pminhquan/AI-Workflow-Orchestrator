@@ -3,6 +3,7 @@ import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {DEFAULT_LIVE_STATE,writeActiveTarget} from './live-bridge.mjs';
 import {canonicalWorkspace} from './contracts.mjs';
+import {refreshSelectedReceiverOnBeacon} from './selected-receiver.mjs';
 
 function extractWorkspaces(payload){
  const candidates=[];
@@ -24,16 +25,19 @@ function extractWorkspaces(payload){
 }
 
 export function processBeaconInput(payload,{eventName='SessionStart',stateDirectory=DEFAULT_LIVE_STATE,now=Date.now}={}){
- const conversationId=payload?.conversationId??payload?.conversation_id??payload?.sessionId??null;
+ const conversationId=payload?.conversationId??payload?.conversation_id??null;
  if(typeof conversationId!=='string'||!conversationId.trim())return {updated:[],skipped:'missing_conversation_id'};
  const event=String(payload?.hookEventName??payload?.event??eventName??'SessionStart');
  const modelName=payload?.modelName??payload?.model??null;
  const workspaces=extractWorkspaces(payload);
  const updated=[];
+ const rawTimestamp=payload?.timestamp??payload?.eventTimestamp;
+ const eventTimestamp=typeof rawTimestamp==='string'&&Number.isFinite(Date.parse(rawTimestamp))?new Date(rawTimestamp).toISOString():new Date(now()).toISOString();
  for(const ws of workspaces){
-  const res=writeActiveTarget(ws,{conversationId,eventName:event,modelName,stateDirectory,now});
+  const res=writeActiveTarget(ws,{conversationId,eventName:event,modelName,workspacePaths:workspaces,eventTimestamp,stateDirectory,now});
   updated.push({workspace_root:ws,conversation_id:res.target.conversation_id,path:res.path});
  }
+ refreshSelectedReceiverOnBeacon(conversationId,{stateDirectory,eventTimestamp,now});
  return {updated,skipped:updated.length?null:'no_valid_workspace'};
 }
 
@@ -66,6 +70,7 @@ export async function main(args=process.argv.slice(2)){
  }
  if(seedWorkspace&&seedConversation){
   const res=writeActiveTarget(seedWorkspace,{conversationId:seedConversation,eventName,modelName:seedModel,stateDirectory});
+  refreshSelectedReceiverOnBeacon(seedConversation,{stateDirectory});
   process.stdout.write(JSON.stringify({ok:true,target:res.target,path:res.path})+'\n');
   return;
  }

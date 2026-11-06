@@ -135,6 +135,7 @@ test('constants, frozen reason enum, and strict ISO-8601 parser validate edge ca
   'TARGET_FOREIGN_PROJECT',
   'TARGET_FUTURE',
   'TARGET_STALE',
+  'TARGET_AMBIGUOUS',
   'WORKSPACE_SLOT_HELD'
  ]);
 

@@ -1,4 +1,4 @@
-import {inScope} from '../core/util.mjs';
+import {inScope,overlaps} from '../core/util.mjs';
 import {boundedJSON,canonicalWorkspace,noKnownSecrets,validateScopePath} from './contracts.mjs';
 
 export const SUBTASK_AGENT_TYPES = ['research', 'implementer', 'tester', 'reviewer'];
@@ -23,8 +23,8 @@ function normalizeScopeList(paths = [], workspace, allowedScope, fieldName, subt
 }
 
 export function validateSubtaskPlan(subtasks, { readScope = [], writeScope = [], workspaceRoot } = {}) {
-  if (!Array.isArray(subtasks) || subtasks.length < 1 || subtasks.length > 8) {
-    throw Error('Subtasks must be an array of 1..8 items');
+  if (!Array.isArray(subtasks) || subtasks.length < 1) {
+    throw Error('Subtasks must be a non-empty array');
   }
   boundedJSON(subtasks, MAX_SUBTASKS_BYTES, 'Subtasks');
   noKnownSecrets(subtasks);
@@ -111,6 +111,13 @@ export function validateSubtaskPlan(subtasks, { readScope = [], writeScope = [],
           for (const pb of b.write_scope) {
             if (inScope(pa, [pb]) || inScope(pb, [pa])) {
               throw Error(`Overlapping subtask write_scope in wave ${wave}: ${a.id} vs ${b.id}`);
+            }
+          }
+        }
+        for(const [writer,reader] of [[a,b],[b,a]]){
+          for(const output of writer.write_scope){
+            if(reader.read_scope.some(input=>overlaps(output,input))){
+              throw Error(`Read/write dependency in wave ${wave}: ${writer.id} -> ${reader.id}; use sequential waves`);
             }
           }
         }

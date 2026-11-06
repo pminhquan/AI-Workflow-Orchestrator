@@ -2,11 +2,11 @@ import {lstatSync,readdirSync,realpathSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {sha256,scopedPath} from '../core/util.mjs';
 import {isSensitivePath,noKnownSecrets} from './contracts.mjs';
-import {EXCLUDED_ROOTS,readBoundedBytes} from './verification.mjs';
+import {EXCLUDED_ROOTS,readBoundedBytes,MAX_WORKSPACE_BYTES,MAX_WORKSPACE_FILE_BYTES} from './verification.mjs';
 
 const RACY_WRITE_WINDOW_MS = 50;
 const MAX_SNAPSHOT_FILES = 2000;
-const MAX_SNAPSHOT_BYTES = 16 * 1024 * 1024;
+const MAX_SNAPSHOT_BYTES = MAX_WORKSPACE_BYTES;
 
 const workspaceCaches = new Map();
 let hits = 0;
@@ -76,7 +76,7 @@ export function captureWorkspaceFast(workspace, { verifyHashes = false } = {}) {
         entries[relativePath] = cached.hash;
       } else {
         misses++;
-        const data = readBoundedBytes(path, MAX_SNAPSHOT_BYTES - (bytes - stat.size));
+        const data = readBoundedBytes(path, Math.min(MAX_WORKSPACE_FILE_BYTES,MAX_SNAPSHOT_BYTES - (bytes - stat.size)));
         bytes += data.length - stat.size;
         const hash = sha256(data);
         fileCache.set(relativePath, {
@@ -96,7 +96,7 @@ export function captureWorkspaceFast(workspace, { verifyHashes = false } = {}) {
       const configRoot = scopedPath(workspace, name);
       if (!lstatSync(configRoot).isDirectory()) throw Error('Project .codex must be a regular directory');
       const children = readdirSync(configRoot);
-      if (children.some(child => child !== 'config.toml')) throw Error('Unexpected private project .codex entry');
+      // Ignore private Codex entries; only the already managed MCP config is hashed.
       if (children.includes('config.toml')) {
         const config = readBoundedBytes(scopedPath(workspace, '.codex/config.toml'), 32768);
         noKnownSecrets(config.toString('utf8'));

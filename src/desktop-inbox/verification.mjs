@@ -4,6 +4,9 @@ import {sha256,scopedPath} from '../core/util.mjs';
 import {changedFiles,verifyScope,CheckRunner} from '../verification/checks.mjs';
 import {validateReport,isSensitivePath,canonicalWorkspace,MAX_REPORT_BYTES,noKnownSecrets} from './contracts.mjs';
 
+export const MAX_WORKSPACE_BYTES=64*1024*1024;
+export const MAX_WORKSPACE_FILE_BYTES=16*1024*1024;
+
 export const EXCLUDED_ROOTS = ['.git','.venv','node_modules','state','__pycache__','.pytest_cache','dist','build','.next','.turbo','coverage','target','.idea','.vscode'];
 
 export function readBoundedBytes(path,limit) {
@@ -32,8 +35,8 @@ export function captureWorkspace(workspace) {
     if (stat.isDirectory()) {
       for (const child of readdirSync(path).sort()) visit(relativePath+'/'+child);
     } else {
-      if (!stat.isFile() || ++count > 2000 || (bytes += stat.size) > 16*1024*1024) throw Error('Workspace snapshot limit/nonregular file');
-      const data = readBoundedBytes(path,16*1024*1024-(bytes-stat.size));
+      if (!stat.isFile() || ++count > 2000 || (bytes += stat.size) > MAX_WORKSPACE_BYTES) throw Error('Workspace snapshot limit/nonregular file');
+      const data = readBoundedBytes(path,Math.min(MAX_WORKSPACE_FILE_BYTES,MAX_WORKSPACE_BYTES-(bytes-stat.size)));
       bytes += data.length-stat.size;
       entries[relativePath] = sha256(data);
     }
@@ -46,7 +49,8 @@ export function captureWorkspace(workspace) {
       // Do not traverse private configuration. Only the project-local MCP file
       // explicitly requested for this bridge is eligible for a parent hash.
       const children = readdirSync(configRoot);
-      if (children.some(child=>child !== 'config.toml')) throw Error('Unexpected private project .codex entry');
+      // Other private Codex entries are outside this ordinary source audit.
+      // Do not traverse them or expose their contents to workers.
       if (children.includes('config.toml')) {
         const config = readBoundedBytes(scopedPath(workspace,'.codex/config.toml'),32768);
         noKnownSecrets(config.toString('utf8'));
@@ -85,7 +89,7 @@ export function inspectHandoffArtifacts(job) {
       errors_source:Object.hasOwn(original,'errors')?'report.json':'explicit worker no-errors declaration in result.md'}};
 }
 
-export async function verifyJob(inbox,taskId,{checks = {},review} = {}) {
+export async function verifyJob(inbox,taskId,{checks = {},review,snapshot = captureWorkspace} = {}) {
   const record = inbox.get(taskId), job = record.job;
   if (record.state !== 'RESULT_READY') throw Error('Only RESULT_READY can be verified');
   if (record.outcome === 'CANCELLED') throw Error('Cancelled task cannot be verified');
@@ -93,7 +97,7 @@ export async function verifyJob(inbox,taskId,{checks = {},review} = {}) {
   const report = readReport(inbox,record);
   if (report.status !== 'reported' || report.blockers.length || report.errors.length) throw Error('Worker blocked/failed or reported errors; parent acceptance unavailable');
   if (typeof review !== 'function') throw Error('Independent parent source/findings review is required');
-  const before = captureWorkspace(job.workspace_root);
+  const before = snapshot(job.workspace_root);
   const actual = changedFiles(record.baseline,before);
   verifyScope(actual,report.changed_files,job.write_scope);
   // Fresh runner every acceptance, no cache and no command derived from task text.
@@ -113,7 +117,7 @@ export async function verifyJob(inbox,taskId,{checks = {},review} = {}) {
   const decision = await review({job:structuredClone(job),report:structuredClone(report),
     actual_changed_files:actual,checks:structuredClone(receipts)});
   if (!decision || decision.accepted !== true) throw Error('Parent review did not accept findings');
-  const after = captureWorkspace(job.workspace_root);
+  const after = snapshot(job.workspace_root);
   if (before.hash !== after.hash) throw Error('Workspace changed during parent verification');
   readReport(inbox,record);
   const hostReceipt = {kind:'desktop-inbox.host-receipt@1',task_id:job.task_id,

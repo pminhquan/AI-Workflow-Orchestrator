@@ -4,13 +4,15 @@ import {resolve} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {ROOT,scopedPath,sha256} from '../core/util.mjs';
 import {MAX_JOB_AGE_MS} from './contracts.mjs';
+import {inspectWorkspaceReadiness} from './readiness.mjs';
+import {readJobReceiver,resolveEffectiveReceiver} from './selected-receiver.mjs';
 import {
  DEFAULT_LIVE_STATE,
  buildSingleLineTrigger,
  checkedStateDirectory,
  collectWorkerReport,
  listLiveWorkspaces,
- openLiveInbox,
+ existingLiveInbox,
  readActiveTarget,
  readBoundedJSON,
  resolveWorkspaceConfig,
@@ -49,10 +51,10 @@ function acquireProcessLock(lockPath){
  return ()=>{try{if(existsSync(lockPath))unlinkSync(lockPath);}catch{}};
 }
 
-const SIDECAR_CODE_VERSION='2.5.1';
+const SIDECAR_CODE_VERSION='2.6.0';
 const WATCHED_MODULES=[
  fileURLToPath(import.meta.url),
- scopedPath(ROOT,'src/desktop-inbox/live-bridge.mjs')
+ ...['live-bridge','selected-receiver','readiness','contracts','inbox'].map(name=>scopedPath(ROOT,`src/desktop-inbox/${name}.mjs`))
 ];
 
 function computeCodeFingerprint(){
@@ -171,15 +173,25 @@ export async function runLiveSidecarTick({
   if(signal?.aborted)break;
   const target=readActiveTarget(ws,{stateDirectory:checkedState});
   if(target?.conversation_id)activeTargets++;
-  const {inbox,config}=openLiveInbox(ws,{stateDirectory:checkedState,now});
+  const {inbox,config}=existingLiveInbox(ws,{stateDirectory:checkedState,now});
+  if(!inbox)continue;
   const records=inbox.list();
   for(const rec of records){
    if(rec.state==='DISPATCHED'&&!['FAILED','RELEASED'].includes(rec.outcome)){
     try{
      const updated=collectWorkerReport(inbox,rec.job.task_id);
-     if(updated.state==='RESULT_READY')actions.push({workspace_root:ws,task_id:rec.job.task_id,action:'COLLECTED_REPORT'});
+     if(updated.state==='RESULT_READY'){
+      actions.push({workspace_root:ws,task_id:rec.job.task_id,action:'COLLECTED_REPORT'});
+      continue;
+     }
     }catch(error){
      actions.push({workspace_root:ws,task_id:rec.job.task_id,action:'REPORT_ERROR',error:error.message});
+    }
+    if(rec.outcome==='UNCERTAIN_DELIVERY'&&now()-Date.parse(rec.job.created_at)>MAX_JOB_AGE_MS){
+     try{
+      inbox.release(rec.job.task_id,'Auto-released expired uncertain delivery (>10m)');
+      actions.push({workspace_root:ws,task_id:rec.job.task_id,action:'EXPIRED_UNCERTAIN_RELEASED'});
+     }catch{}
     }
    }
   }
@@ -191,17 +203,26 @@ export async function runLiveSidecarTick({
    actions.push({workspace_root:ws,task_id:pending.job.task_id,action:'EXPIRED_RELEASED'});
    continue;
   }
+  // Evaluate exactly the same workspace/age/ambiguity gates as the MCP status.
+  // Ignore only the pending job's own slot when deciding whether it may dispatch.
+  let selected=null;
+  try{selected=readJobReceiver(inbox,pending.job);}catch(error){actions.push({workspace_root:ws,task_id:pending.job.task_id,action:'INVALID_DELIVERY_TARGET',error:error.message});continue;}
+  const readiness=inspectWorkspaceReadiness({workspaceRoot:ws,stateDirectory:checkedState,records:[],now});
+  const effectiveSelected=resolveEffectiveReceiver(readiness,selected);
+  const targetReasons=effectiveSelected?[]:readiness.reason_codes.filter(code=>code.startsWith('TARGET_'));
+  if(targetReasons.length){
+   actions.push({workspace_root:ws,task_id:pending.job.task_id,action:'WAITING_FOR_GUI_SESSION',reason_codes:targetReasons});
+   continue;
+  }
   let mode=null,argv=null,conversationId=null;
-  const paths=writeJobBrief(inbox,pending.job);
+  const paths=writeJobBrief(inbox,pending.job,{stateDirectory:checkedState});
   mkdirSync(paths.output_directory,{recursive:true});
   const trigger=buildSingleLineTrigger(pending.job,paths.brief_md_path);
-  if(target?.conversation_id){
+  const dispatchTarget=effectiveSelected??readiness.active_gui_target;
+  if(dispatchTarget?.conversation_id){
    mode='send-message';
-   conversationId=target.conversation_id;
+   conversationId=dispatchTarget.conversation_id;
    argv=['send-message',conversationId,trigger];
-  }else if(config.allow_new_conversation){
-   mode='new-conversation';
-   argv=['new-conversation','--',trigger];
   }else{
    actions.push({workspace_root:ws,task_id:pending.job.task_id,action:'WAITING_FOR_GUI_SESSION'});
    continue;
@@ -214,10 +235,21 @@ export async function runLiveSidecarTick({
   }catch{
    call={started:true,spawn_error:'UNKNOWN',exit_code:null,exit_signal:null,timed_out:false,output_overflow:false,stdout_sha256:sha256(''),stderr_sha256:sha256(''),stdout_bytes:0,stderr_bytes:0};
   }
+  const fallbackConvId=readiness.active_gui_target?.conversation_id;
+  if(call.exit_code!==0&&fallbackConvId&&fallbackConvId!==conversationId&&readiness.target_observation?.bound&&readiness.target_observation?.fresh){
+   try{
+    const retryCall=await invokeAgentapi(['send-message',fallbackConvId,trigger],{timeoutMs:transportTimeoutMs,signal,cwd:inbox.root,env});
+    if(retryCall.exit_code===0&&!retryCall.timed_out&&!retryCall.spawn_error){
+     call=retryCall;
+     conversationId=fallbackConvId;
+    }
+   }catch{}
+  }
   const dispatchLatencyMs=Math.max(0,now()-Date.parse(pending.job.created_at));
   const receipt={
    kind:'ANTIGRAVITY_AGENTAPI',
    mode,
+   target_mode:effectiveSelected&&conversationId===effectiveSelected.conversation_id?'user_selected_receiver':'matching_workspace',
    target_conversation_id:conversationId,
    dispatched_at:new Date(now()).toISOString(),
    dispatch_latency_ms:dispatchLatencyMs,
@@ -252,7 +284,7 @@ export async function runLiveSidecarTick({
 
 export async function startLiveSidecar({
  stateDirectory=DEFAULT_LIVE_STATE,
- pollIntervalMs=500,
+ pollIntervalMs=30000,
  transportTimeoutMs=15000,
  invokeAgentapi=defaultInvokeAgentapi,
  maxTicks=Infinity,
@@ -260,20 +292,22 @@ export async function startLiveSidecar({
  signal,
  now=Date.now
 }={}){
+ if(!Number.isFinite(pollIntervalMs)||pollIntervalMs<100||pollIntervalMs>60000)throw Error('Sidecar fallback scan interval must be 100..60000 ms');
  const checkedState=checkedStateDirectory(stateDirectory);
  const stateRoot=scopedPath(ROOT,checkedState);
  mkdirSync(stateRoot,{recursive:true});
  const releaseLock=acquireProcessLock(scopedPath(stateRoot,'sidecar.lock'));
  const bootFingerprint=computeCodeFingerprint();
- let watcher=null,wake=null,ticks=0,coalesceTimer=null;
+ let watcher=null,wake=null,ticks=0,coalesceTimer=null,dirty=true,lastScanAt=-Infinity,lastTick=null;
  try{
   for(const ws of listLiveWorkspaces({stateDirectory:checkedState})){
-   try{const {inbox}=openLiveInbox(ws,{stateDirectory:checkedState,now});inbox.recover();}catch{}
+   try{const {inbox}=existingLiveInbox(ws,{stateDirectory:checkedState,now});inbox?.recover();}catch{}
   }
   try{
    watcher=watch(stateRoot,{recursive:true},(_event,name)=>{
     const rel=String(name??'').replaceAll('\\','/');
-    if(rel.endsWith('sidecar-heartbeat.json')||rel.endsWith('sidecar.lock')||rel.includes('.tmp-'))return;
+    if(rel.endsWith('sidecar-heartbeat.json')||rel.endsWith('sidecar.lock')||rel.endsWith('transaction.lock')||rel.includes('.tmp-'))return;
+    dirty=true;
     clearTimeout(coalesceTimer);
     coalesceTimer=setTimeout(()=>{coalesceTimer=null;wake?.();},25);
    });
@@ -281,7 +315,12 @@ export async function startLiveSidecar({
   }catch{}
   while(!signal?.aborted&&ticks<maxTicks){
    ticks++;
-   await runLiveSidecarTick({stateDirectory:checkedState,invokeAgentapi,transportTimeoutMs,codeFingerprint:bootFingerprint,env,signal,now});
+   if(dirty||performance.now()-lastScanAt>=pollIntervalMs){
+    dirty=false;lastScanAt=performance.now();
+    lastTick=await runLiveSidecarTick({stateDirectory:checkedState,invokeAgentapi,transportTimeoutMs,codeFingerprint:bootFingerprint,env,signal,now});
+   }else{
+    writeSidecarHeartbeat('RUNNING',{stateDirectory:checkedState,now,extra:{code_version:SIDECAR_CODE_VERSION,code_fingerprint:bootFingerprint,...inspectAgentapiEnv(env),workspaces_count:lastTick?.workspaces_count??0,active_targets:lastTick?.active_targets??0,last_actions:[]}});
+   }
    if(maxTicks===Infinity&&computeCodeFingerprint()!==bootFingerprint){
     writeSidecarHeartbeat('RELOADING',{stateDirectory:checkedState,now,extra:{ticks,code_version:SIDECAR_CODE_VERSION,reason:'source_code_updated'}});
     return {status:'RELOADING',ticks};
@@ -289,7 +328,7 @@ export async function startLiveSidecar({
    if(signal?.aborted||ticks>=maxTicks)break;
    await new Promise(resolveSleep=>{
     const finish=()=>{clearTimeout(timer);signal?.removeEventListener('abort',finish);wake=null;resolveSleep();};
-    const timer=setTimeout(finish,pollIntervalMs);
+    const timer=setTimeout(finish,Math.min(5000,pollIntervalMs));
     wake=finish;
     signal?.addEventListener('abort',finish,{once:true});
     if(signal?.aborted)finish();
@@ -305,7 +344,7 @@ export async function startLiveSidecar({
 }
 
 export async function main(args=process.argv.slice(2)){
- let stateDirectory=DEFAULT_LIVE_STATE,pollIntervalMs=500,maxTicks=Infinity;
+ let stateDirectory=DEFAULT_LIVE_STATE,pollIntervalMs=30000,maxTicks=Infinity;
  for(let i=0;i<args.length;i++){
   if(args[i]==='--state'&&args[i+1])stateDirectory=args[++i];
   else if(args[i]==='--interval-ms'&&args[i+1])pollIntervalMs=Number.parseInt(args[++i],10);

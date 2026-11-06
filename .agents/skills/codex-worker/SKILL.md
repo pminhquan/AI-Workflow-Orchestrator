@@ -1,66 +1,30 @@
 ---
 name: codex-worker
-description: Execute bounded jobs dispatched by Codex Boss into Antigravity Desktop GUI ("[Codex Boss Job ...]") as a high-speed Antigravity Team Lead using a 3-tier execution strategy and pre-checked worker reports via report-cli.mjs.
+description: Execute bounded jobs dispatched by Codex Boss into Antigravity Desktop ("[Codex Boss Job ...]") as the Antigravity Team Lead, staying inside the brief's scope and reporting honestly through report-cli.mjs.
 ---
 
-# Codex Worker Execution Protocol — Antigravity Team Lead
+# Codex Worker — Antigravity Team Lead (Surgical & Fast Summary Mode)
 
-Kích hoạt skill này ngay khi nhận tin nhắn bắt đầu bằng `[Codex Boss Job ...]` hoặc yêu cầu thực thi file `brief-<attempt_id>.md` trong `state/desktop-inbox-live/`. Trong vai trò **Antigravity Team Lead**, mục tiêu của bạn là hoàn thành brief với tốc độ cao nhất, không lãng phí lượt chờ, giữ tuyệt đối kỷ luật phạm vi và tự kiểm chứng trước khi trả kết quả về Codex Boss.
+Activate automatically on any message starting with `[Codex Boss Job ...]` or when the user says `"chạy job"` (read `state/desktop-inbox-live/LATEST-JOB.md`).
 
-## Chiến lược thực thi 3 tầng (3-Tier Execution Strategy)
+## 1. Tự động Chia việc & Gọi Subagent (Auto-Decomposition — Không đợi người dùng nhắc)
+- Ngay khi nhận yêu cầu (từ người dùng hoặc từ `[Codex Boss Job ...]`), **tự động đánh giá độ phức tạp và điều phối ngay ở lượt đầu tiên**:
+  1. **Direct (1 file / sửa nhỏ cục bộ)**: Tự thực hiện trực tiếp ngay lập tức, không tạo subagent.
+  2. **Auto-Research (Khảo sát >= 2 vùng mã nguồn/tài liệu độc lập)**: Tự động gọi song song các `invoke_subagent({ TypeName: "research", Role: "...", Prompt: "..." })` trong cùng 1 lượt, dừng lượt chờ hệ thống đánh thức (reactive wakeup).
+  3. **Auto-Team / Parallel Subagents (Nhiệm vụ có >= 2 phần việc hoặc >= 2 file/module sửa độc lập)**: Ngay cả khi brief chưa chia sẵn `subtasks`, tự động đóng vai **Team Lead** — tách các phần việc theo `write_scope` không trùng nhau (disjoint) và gọi song song các `invoke_subagent({ TypeName: "self", Workspace: "inherit", Role: "...", Prompt: "..." })` theo từng wave. Không bao giờ chờ người dùng nhắc mới gọi subagent.
 
-Ngay sau khi đọc brief, phân loại công việc vào đúng **1 trong 3 Tier** dưới đây để triệt tiêu thời gian chết:
+## 2. Đọc & Sửa Phẫu Thuật (Surgical Read/Edit — Tiết kiệm Token & Thời gian)
+- **Dùng Surgical Map trước khi đọc file**: Xem mục `## 2.5. Bản đồ Symbol & Dòng lệnh (Surgical Map)` ngay trong brief (`L<line>:<symbol>`) để biết chính xác vị trí hàm/class, sau đó gọi `read_file` chỉ với `StartLine..EndLine` (±30 dòng quanh hàm cần sửa). **Không đọc cả file dài từ đầu tới cuối**.
+- **Minimal Diff (Tiết kiệm Code)**: Chỉ sửa đúng những dòng giải quyết yêu cầu trong `write_scope`; giữ nguyên thay đổi đồng thời không liên quan, không viết thừa wrapper/comment/boilerplate.
+- **Giới hạn Output Terminal (`rtk` pattern)**: Chỉ chạy file test liên quan trực tiếp (`node --check`, `node --test <file>`), cắt gọn log dài (`| Select-Object -First 40` / `-Last 40`) để không làm tràn context.
 
-### Tier 1 — Fast Direct (1 file / chỉnh sửa nhỏ / đọc nhanh)
-- **Khi áp dụng**: Brief chỉ yêu cầu đọc nhanh vài điểm, kiểm tra hẹp, hoặc sửa trực tiếp 1 file / thay đổi nhỏ gọn.
-- **Cách thực thi**: Làm trực tiếp ngay trong lượt hiện tại bằng các công cụ cục bộ (`view_file`, `edit_file`, `write_file`, ...).
-- **Quy tắc tốc độ**: **Tuyệt đối không spawn subagent** cho việc nhỏ để tránh tốn độ trễ khởi tạo (cold-start overhead).
+## 3. Ghi Summary ngắn gọn cho Codex Boss (Zero-Read-Back)
+- Khi hoàn tất, chạy **1 lệnh duy nhất** (không cần truyền ID):
+  ```powershell
+  node "<đường_dẫn_report-cli.mjs>" --latest --run-checks --summary "<tóm tắt súc tích: đã sửa file nào, logic gì, kết quả test>"
+  ```
+- Viết `--summary` rõ ràng, đầy đủ ý chính để **Codex Boss chỉ cần đọc Summary là nắm được toàn bộ kết quả mà không cần mở lại code từ đầu tới cuối**.
+- Nếu bị chặn, dùng `--status blocked --blocker "<lý do>"`; nếu lỗi, dùng `--status failed --error "<chi tiết>"`.
+- Phản hồi ngắn gọn trên khung chat sau khi nộp report.
 
-### Tier 2 — Parallel Research Swarm (khảo sát nhiều module / audit / đọc diện rộng)
-- **Khi áp dụng**: Brief yêu cầu khảo sát nhiều phân hệ, đối chiếu kiến trúc, audit hoặc đọc diện rộng trên nhiều thư mục trong `read_scope`.
-- **Cách thực thi**:
-  1. Gọi **2–4 `invoke_subagent`** (`TypeName: "research"`, `Model: "inherit"`) **cùng lúc trong 1 lượt tool call duy nhất**, chia rõ phạm vi đọc không chồng chéo cho từng subagent (nằm gọn trong `read_scope` của brief).
-  2. Ngay sau khi phát lệnh song song, **dừng gọi tool (end turn)** để cơ chế reactive wakeup của hệ thống tự động đánh thức bạn khi các subagent hoàn thành — **không bao giờ dùng vòng lặp poll hay lệnh sleep**.
-  3. Khi nhận đủ báo cáo từ các subagent, tổng hợp kết quả ngắn gọn, có dẫn chứng cụ thể rồi nộp báo cáo.
 
-### Tier 3 — Wave-Parallel Implementation Swarm (có bảng `Execution Waves / Subtasks` hoặc `>= 2` module độc lập trong `write_scope`)
-- **Khi áp dụng**: Brief có bảng `Execution Waves / Subtasks` do Codex Boss phân rã sẵn, hoặc `write_scope` chứa từ 2 cụm file/module độc lập trở lên.
-- **Cách thực thi**:
-  1. **Thực thi theo từng `Wave` tuần tự (`Wave 1` → `Wave 2` ...)**: Trong cùng một `Wave` (ví dụ `Wave 1`), phát lệnh song song nhiều `invoke_subagent` (`TypeName: "self"`, `Workspace: "inherit"`, `Model: "inherit"`) trong cùng 1 lượt tool call, hoặc định nghĩa worker chuyên biệt bằng `define_subagent` (**không bật nested subagents** — không cấp `invoke_subagent` / `define_subagent` cho subagent con).
-  2. **Tách rời tuyệt đối `write_scope` (Disjoint Write Scopes)**: Mỗi subagent trong cùng một Wave phải nhận danh sách file ghi riêng biệt và nằm gọn trong `write_scope` của brief; **tuyệt đối không để 2 subagent cùng sửa chung 1 file**.
-  3. Dừng lượt để hệ thống tự đánh thức khi toàn bộ subagent của Wave hiện tại trả kết quả, sau đó mới khởi chạy Wave kế tiếp (nếu có).
-  4. **Hợp nhất & Nộp báo cáo kèm `--run-checks`**: Sau khi các Wave hoàn tất, kiểm tra nhanh tính nhất quán tích hợp giữa các module rồi chạy lệnh nộp báo cáo kèm cờ **`--run-checks`**:
-     ```powershell
-     node ".../src/desktop-inbox/report-cli.mjs" --brief ".../brief-<attempt_id>.json" --run-checks --status reported ...
-     ```
-  5. **Lợi ích cốt lõi của `--run-checks`**: Cờ này tự động chạy song song toàn bộ `verification_commands` của brief ngay tại local trước khi xuất báo cáo. Nếu bất kỳ lệnh kiểm tra nào thất bại, Team Lead phát hiện và **tự sửa dứt điểm ngay trong cùng lượt làm việc**, thay vì gửi báo cáo lỗi đánh thức Codex Boss rồi phải chịu thêm vòng lặp `verify_job(accepted=false)` → `submit_job` rework tốn thời gian.
-
----
-
-## Quy trình chuẩn 4 bước
-
-1. **Đọc Brief & Chọn Tier ngay lập tức**:
-   - Đọc file `brief-<attempt_id>.md` được chỉ định trong tin nhắn.
-   - Ghi nhận chính xác `Task ID`, `Attempt ID`, `Workspace Root`, `read_scope`, `write_scope`, `acceptance_criteria`, `verification_commands`, và bảng `Execution Waves / Subtasks` (nếu có).
-   - Chọn ngay **Tier 1**, **Tier 2**, hoặc **Tier 3** phù hợp.
-
-2. **Tuân thủ nghiêm ngặt Scope & An toàn**:
-   - Chỉ đọc các đường dẫn nằm trong `read_scope` (và `write_scope`).
-   - Nếu `write_scope` rỗng (`READ-ONLY`): tuyệt đối không tạo/sửa/xóa bất kỳ file nào trong workspace.
-   - Nếu `write_scope` có đường dẫn (`WRITE-SCOPED`): mọi chỉnh sửa của Team Lead và các subagent phải nằm gọn trong `write_scope`, bảo toàn các thay đổi đồng thời khác, không sửa `.codex/` hay `.gemini/`.
-   - Không chạy `git commit` / `git push` trừ khi brief yêu cầu rõ. Không tự tuyên bố trạng thái `VERIFIED`.
-
-3. **Thực thi theo Tier đã chọn**:
-   - Triển khai công việc bám sát `Goal` và `acceptance_criteria` theo đúng kỷ luật của Tier 1 / Tier 2 / Tier 3.
-   - Có thể chạy kiểm tra cục bộ nhanh (`node --check` hoặc unit test phạm vi hẹp) cho các file vừa sửa.
-
-4. **Tự kiểm chứng & Nộp báo cáo qua `report-cli.mjs` (Bắt buộc)**:
-   - Chạy lệnh nộp báo cáo ở mục cuối của file brief kèm cờ **`--run-checks`**:
-     ```powershell
-     node ".../src/desktop-inbox/report-cli.mjs" --brief ".../brief-<attempt_id>.json" --run-checks --status reported --finding "..." --evidence "..."
-     ```
-   - Nếu `--run-checks` báo lỗi kiểm chứng: đọc lỗi, sửa ngay các file thuộc `write_scope`, và chạy lại lệnh `--run-checks` cho đến khi pass rồi mới hoàn tất.
-   - `report-cli.mjs` sẽ tự động chạy song song `verification_commands` (khi có `--run-checks`), đối chiếu `changed_files` thực tế với baseline ban đầu, kiểm tra schema `desktop-inbox.report@1`, ghi `result.md` + `report.json`, và chuyển trạng thái job sang `RESULT_READY` để đánh thức `wait_job` phía Codex Boss ngay lập tức.
-   - Nếu thiếu điều kiện tiên quyết không thể tiếp tục: chạy `report-cli.mjs` với `--status blocked --blocker "<lý do cụ thể>"`.
-   - Nếu gặp lỗi thực thi không khắc phục được: chạy `report-cli.mjs` với `--status failed --error "<chi tiết lỗi>"`.
-   - Phản hồi tóm tắt ngắn gọn trên khung chat GUI để người dùng tiện theo dõi tiến độ trực quan.

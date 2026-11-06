@@ -128,10 +128,11 @@ export function deriveTaskTelemetry(record) {
   const queuedAt = firstStateEventMs(events, 'PENDING');
   const claimedAt = firstStateEventMs(events, 'CLAIMED');
   const dispatchIntentAt = firstStateEventMs(events, 'DISPATCHED');
-  const transportEvent = findTransportReturnEvent(events);
+  const offeredOnly=record?.delivery?.delivery_confirmed===false;
+  const transportEvent = offeredOnly?null:findTransportReturnEvent(events);
   const transportReturnAt = transportEvent
     ? parseEventTimestampMs(transportEvent.at)
-    : (record?.delivery?.status === 'RECORDED'
+    : (!offeredOnly&&record?.delivery?.status === 'RECORDED'
         ? parseEventTimestampMs(record.delivery.dispatched_at)
         : null);
   const reportAt = firstStateEventMs(events, 'RESULT_READY');

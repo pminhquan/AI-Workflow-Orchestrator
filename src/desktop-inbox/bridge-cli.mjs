@@ -12,6 +12,8 @@ import {
 } from './live-bridge.mjs';
 import {inspectWorkspaceReadiness} from './readiness.mjs';
 import {aggregateRecordsTelemetry} from './telemetry.mjs';
+import {inspectGlobalBridgeStatus} from './global-install.mjs';
+import {readSelectedReceiver,selectedReadiness} from './selected-receiver.mjs';
 
 function hasRegularFile(root,rel){
  try{
@@ -27,28 +29,34 @@ export function bridgeDoctor({
  stateDirectory=DEFAULT_LIVE_STATE,
  now=Date.now,
  heartbeatMaxAgeMs,
- targetTtlMs
+ targetTtlMs,
+ globalHomeDir
 }={}){
- const readiness=inspectWorkspaceReadiness({
+ const readiness=selectedReadiness(inspectWorkspaceReadiness({
   workspaceRoot,
   stateDirectory,
   now,
   ...(heartbeatMaxAgeMs!==undefined?{heartbeatMaxAgeMs}:{}),
   ...(targetTtlMs!==undefined?{targetTtlMs}:{})
- });
+ }),readSelectedReceiver({stateDirectory}));
  const {config}=readiness;
  const hasHooks=hasRegularFile(config.workspace_root,'.agents/hooks.json');
  const hasWorkerSkill=hasRegularFile(config.workspace_root,'.agents/skills/codex-worker/SKILL.md');
  const hasBossSkill=hasRegularFile(config.workspace_root,'.agents/skills/antigravity-orchestrator/SKILL.md');
  const hasCodexConfig=hasRegularFile(config.workspace_root,'.codex/config.toml');
  const hasStagedSidecar=hasRegularFile(ROOT,'integrations/antigravity-inbox/awo-bridge.sidecar.json');
+ let globalInstallation;
+ try{globalInstallation=inspectGlobalBridgeStatus(globalHomeDir?{homeDir:globalHomeDir}:{});}
+ catch{globalInstallation={installation_status:'UNAVAILABLE',live_discovery:'NOT VERIFIED'};}
  const clockFn=typeof now==='function'?now:()=>now;
  const snapStart=clockFn();
  const snap=captureWorkspaceFast(config.workspace_root);
  const snapshotMs=Math.max(0,clockFn()-snapStart);
  const snapshotFiles=Object.keys(snap.entries).length;
  return {
-  status:(hasHooks&&hasWorkerSkill&&hasCodexConfig)?'READY':'INCOMPLETE_ONBOARDING',
+  status:(globalInstallation.installation_status==='INSTALLED'||(hasHooks&&hasWorkerSkill&&hasCodexConfig))?'READY':'INCOMPLETE_ONBOARDING',
+  global_installation:{status:globalInstallation.installation_status,live_discovery:globalInstallation.live_discovery},
+  delivery_target:readiness.delivery_target??{mode:'matching_workspace',proves_gui_focus:false},
   workspace_root:config.workspace_root,
   project_id:config.slug,
   checks_registered:Object.keys(config.checks),
