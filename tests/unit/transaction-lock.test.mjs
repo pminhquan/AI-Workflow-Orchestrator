@@ -6,13 +6,10 @@ import {pathToFileURL} from 'node:url';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {randomUUID} from 'node:crypto';
-import {ROOT,inside,sha256} from '../../src/core/util.mjs';
-import {acquireTransactionLock,withTransactionLock} from '../../src/desktop-inbox/transaction-lock.mjs';
-import {Inbox} from '../../src/desktop-inbox/inbox.mjs';
-import {makeJob} from '../../src/desktop-inbox/contracts.mjs';
+import {ROOT,inside} from '../../src/core/util.mjs';
+import {acquireTransactionLock,withTransactionLock} from '../../src/core/transaction-lock.mjs';
 
-const helperURL=pathToFileURL(resolve(ROOT,'src/desktop-inbox/transaction-lock.mjs')).href;
-const inboxURL=pathToFileURL(resolve(ROOT,'src/desktop-inbox/inbox.mjs')).href;
+const helperURL=pathToFileURL(resolve(ROOT,'src/core/transaction-lock.mjs')).href;
 function fixture(){
  const rel='state/test-transaction-lock-'+randomUUID(),root=resolve(ROOT,rel),workspace=resolve(root,'workspace');mkdirSync(workspace,{recursive:true});writeFileSync(resolve(workspace,'README.md'),'# Lock fixture\n');
  return {rel,root,workspace,path:resolve(root,'transaction.lock'),close(){assert.ok(inside(resolve(ROOT,'state'),root)&&root!==resolve(ROOT,'state'));rmSync(root,{recursive:true,force:true});}};
@@ -86,21 +83,6 @@ test('abandoned reap gate and symlink lock stay fail closed',async()=>{
   assert.throws(()=>acquireTransactionLock(f.path,{timeoutMs:20,retryMs:3}),/locked/);assert.equal(JSON.parse(readFileSync(f.path,'utf8')).nonce,dead.nonce);assert.equal(readFileSync(gate,'utf8'),'unknown owner');
   renameSync(f.path,f.path+'.retired');const target=resolve(f.root,'outside.txt');writeFileSync(target,'unchanged');
   if(process.platform!=='win32'){symlinkSync(target,f.path);assert.throws(()=>acquireTransactionLock(f.path,{timeoutMs:15,retryMs:3}),/locked/);assert.equal(readFileSync(target,'utf8'),'unchanged');}
- }finally{if(h)await h.stop();f.close();}
-});
-
-test('real crash after claim or durable dispatch recovers fail-closed without creating/retrying jobs',async()=>{
- const f=fixture();let h;try{
-  const binding={workspace_root:f.workspace,project_id:'crash-lock-fixture'},directory=f.rel+'/inbox',inbox=new Inbox(directory,binding);const entries={'README.md':sha256(readFileSync(resolve(f.workspace,'README.md')))},baseline={entries,hash:sha256(entries)};
-  const job=()=>makeJob(binding,{goal:'Read README',read_scope:['README.md'],write_scope:[],acceptance_criteria:['Accurate finding'],verification_commands:['noop']});
-  for(const dispatch of[false,true]){
-   const j=job();inbox.submit(j,{baseline});
-   const code=`import{Inbox}from ${JSON.stringify(inboxURL)};const i=new Inbox(${JSON.stringify(directory)},${JSON.stringify(binding)});const c=i.claim(${JSON.stringify(j.task_id)});${dispatch?'i.beginDispatch(c.job.task_id,c.claim_id);':''}console.log('READY');setInterval(()=>{},1000);`;
-   h=child(code);await h.ready;await h.stop();
-   const beforeCount=inbox.list().length,changed=inbox.recover();assert.equal(changed.length,1);const r=inbox.get(j.task_id);assert.equal(r.state,dispatch?'DISPATCHED':'CLAIMED');assert.equal(r.outcome,dispatch?'UNCERTAIN_DELIVERY':'FAILED');assert.equal(inbox.list().length,beforeCount);assert.deepEqual(inbox.recover(),[]);
-   if(dispatch)assert.throws(()=>inbox.submit(job(),{baseline}),/active or uncertain/);
-   else assert.throws(()=>inbox.beginDispatch(j.task_id,r.claim_id),/not dispatchable/);
-  }
  }finally{if(h)await h.stop();f.close();}
 });
 

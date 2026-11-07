@@ -8,7 +8,7 @@ description: Token-saving, context-compressing, and surgical code editing discip
 Apply these rules on coding, debugging, and refactoring tasks to minimize token waste, latency, and unnecessary code churn:
 
 ## 1. Targeted Reads with Flexible Context
-- Locate symbols first via `rg -n "<symbol>" <path>` or `node "src/desktop-inbox/codebase-map.mjs" "<workspace>" [scope...]`.
+- Locate symbols first via `rg -n "<symbol>" <path>` or `node "src/core/codebase-map.mjs" "<workspace>" [scope...]`.
 - Read the relevant `StartLine..EndLine` range around the target symbol, and expand the range or read additional context whenever needed to understand surrounding logic (do not enforce a rigid `±30` line limit when more context is required).
 
 ## 2. Terminal Output Capping & Log Retention

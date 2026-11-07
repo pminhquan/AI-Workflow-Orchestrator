@@ -1,5 +1,7 @@
 # Desktop inbox bridge candidate — implementation and activation review
 
+Historical record. The candidate and its operational commands were retired when [Antigravity GUI handoffs](../operations/antigravity-chat.md) became the current workflow.
+
 Ngày: 05/11/2026, Asia/Bangkok. Giữ V2.3 foundation-only.
 
 **Đã implement và kiểm thử offline. Chưa có real Desktop execution.** Live transport bị khóa trong code; sửa các review flags không mở khóa được. Không có installer, global config write, đăng nhập, consumer dispatch hoặc V1 mutation.

@@ -6,5 +6,5 @@
 2. **Context & Terminal Economy**:
    - Locate symbols first (`rg -n` or `codebase-map.mjs`) and read targeted line ranges, expanding freely when more context is needed (no rigid `±30` line restriction).
    - Make minimal diffs, run focused tests without redundant reruns, keep full logs in files, and keep summaries concise while preserving exit codes and critical error details.
-3. **Explicit Bound Reporting (Codex Boss Jobs)**:
-   - When completing a `[Codex Boss Job ...]`, run `node "src/desktop-inbox/report-cli.mjs" --brief "<brief-attempt.json>" --run-checks --summary "<concise summary>"` so the report stays bound to the exact `workspace_root`, `task_id`, and `attempt_id`.
+3. **Status for direct chat handoffs**:
+   - When the prompt specifies a job status file, update that file when starting and finishing. Include a short summary, changed files and check exit codes.

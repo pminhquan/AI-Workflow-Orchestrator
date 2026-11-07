@@ -1,5 +1,11 @@
 # Changelog
 
+## Antigravity GUI handoffs
+
+- Cài một lần để Codex gửi brief nền vào chat Antigravity đã chọn trên Windows. Project và model lấy từ GUI.
+- Theo dõi từng job qua file status riêng theo ngày. Lưu receipt riêng và chặn gửi lại khi chưa rõ kết quả.
+- Gỡ Desktop Inbox, Sidecar, Beacon và các hướng dẫn kích hoạt cũ. Giữ symbol map dưới `src/core/` và audit lịch sử.
+
 ## 2.3.0-foundation — 2026-11-05
 
 - Independently review V2.2 with one read-only native default subagent; retain separate SIMPLE/DIRECT evidence and NOT VERIFIED fresh-session/custom discovery status.

@@ -55,7 +55,7 @@ function reapOrphan(path){
 }
 
 // Caller supplies a checked state path with an existing regular parent. This
-// synchronous mailbox API waits briefly without a CPU busy loop; PID age is
+// synchronous lock API waits briefly without a CPU busy loop; PID age is
 // never evidence of death, and malformed/legacy locks are never broken.
 export function acquireTransactionLock(path,{timeoutMs=250,retryMs=10}={}){
  if(!Number.isInteger(timeoutMs)||timeoutMs<0||timeoutMs>1000||!Number.isInteger(retryMs)||retryMs<1||retryMs>25)throw Error('Invalid bounded transaction lock wait');

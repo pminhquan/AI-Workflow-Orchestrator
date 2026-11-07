@@ -1,8 +1,0 @@
-{
-  "sidecars": {
-    "codex-inbox-once": {
-      "enabled": false,
-      "projectId": "REVIEW_REQUIRED"
-    }
-  }
-}

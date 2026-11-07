@@ -1,6 +1,6 @@
 # Native Codex workflow — generated; canonical source owns updates
 
-This project instruction uses Codex as orchestrator (Boss): handle microtasks DIRECT, delegate bounded work via native subagents, or—when the project-local desktop_inbox MCP server is enabled—dispatch bounded read/write jobs into the open Antigravity Desktop GUI conversation via bridge_status -> submit_job -> wait_job -> verify_job. Do not call the offline scheduler or legacy V1 SQLite bridge.
+Handle small tasks directly and use native subagents when independent work benefits. Hand Antigravity work through the antigravity-jobs skill. It submits the full brief into the selected GUI chat, uses its current model and tracks the exact per-job project status file.
 
 DIRECT: small scope, unclear ownership/dependencies or expected benefit below 2: parent does the work, no subagent, short checklist and appropriate checks.
 DELEGATED: one bounded independent brief, clear ownership/dependencies, useful benefit at or above 2. Parent integrates and verifies.

@@ -1,9 +1,45 @@
-import {existsSync,lstatSync,readdirSync} from 'node:fs';
-import {resolve} from 'node:path';
+import {lstatSync,readdirSync,realpathSync} from 'node:fs';
+import {isAbsolute,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {ROOT,scopedPath} from '../core/util.mjs';
-import {canonicalWorkspace,isSensitivePath,validateScopePath} from './contracts.mjs';
-import {EXCLUDED_ROOTS,readBoundedBytes} from './verification.mjs';
+import {ROOT,scopedPath} from './util.mjs';
+import {readBoundedBytes} from './local-files.mjs';
+
+const EXCLUDED_ROOTS = [
+ '.git','state','node_modules','venv','.venv','__pycache__','.pytest_cache','.mypy_cache','.ruff_cache',
+ '.tox','.nox','.next','.turbo','.gradle','.cache','.idea','.vscode','dist','build','coverage','target','bin','obj'
+];
+const privateComponent=/^(?:\.git|\.aws|\.ssh|\.gemini|\.codex|\.antigravity|\.azure|\.gcp|\.config|\.netrc|\.npmrc|\.pypirc|\.env(?:\..*)?|id_rsa.*|id_ed25519.*)$/i;
+const privateFile=/^(?:\.?(?:credentials?|tokens?|cookies?|cookiejar|auth(?:entication)?|oauth|secrets?|keyring)(?:[-_.][A-Za-z0-9_-]+)*\.(?:json|jsonl|ya?ml|toml|ini|cfg|conf|txt)|application_default_credentials\.json|mcp_config\.json|bridge\.config\.json)$/i;
+const bareCredentialStore=/^(?:credentials?|tokens?|cookies?|cookiejar|keyring)$/i;
+const privateRuntimeRoot=/^(?:sessions?|transcripts?|cookies?|credentials?|tokens?|keyring)$/i;
+
+function isSensitivePath(path,{directory=false}={}) {
+ const parts=path.split('/');
+ if(parts.some(part=>privateComponent.test(part)||/\.(?:pem|key|sqlite\d*|db|p12|pfx|kdbx)$/i.test(part)))return true;
+ if(privateRuntimeRoot.test(parts[0]))return true;
+ const leaf=parts.at(-1);
+ return privateFile.test(leaf)||(!directory&&bareCredentialStore.test(leaf));
+}
+
+function canonicalWorkspace(root) {
+ if(typeof root!=='string'||root!==root.trim()||/[\x00-\x1f\x7f]/.test(root)||!isAbsolute(root)||
+    /(?:^|[\\/])\.{1,2}(?:[\\/]|$)/.test(root)||root.startsWith('\\\\')||root.startsWith('//')) {
+  throw Error('Workspace must be an absolute canonical local directory');
+ }
+ const resolved=resolve(root),actual=realpathSync(root);
+ const norm=path=>process.platform==='win32'?path.toLowerCase():path;
+ if(norm(resolved)!==norm(actual)||!lstatSync(actual).isDirectory()||lstatSync(resolved).isSymbolicLink()) {
+  throw Error('Workspace aliases/links are unsupported');
+ }
+ return actual;
+}
+
+function validateScopePath(workspace,path) {
+ if(path.length>240||/[*?<>|"\x7f]/.test(path))throw Error('Unsupported scope path');
+ const full=scopedPath(workspace,path);
+ if(isSensitivePath(path,{directory:lstatSync(full,{throwIfNoEntry:false})?.isDirectory()}))throw Error('Sensitive scope path');
+ return full;
+}
 
 const CODE_EXT=/\.(?:mjs|cjs|js|ts|tsx|jsx|py|go|rs|java|cs|rb|php|ps1|sh)$/i;
 const DOC_OR_CONFIG_EXT=/\.(?:md|json|toml|ya?ml)$/i;

@@ -1,8 +1,0 @@
-{
-  "sidecars": {
-    "desktop-inbox-candidate": {
-      "enabled": false,
-      "projectId": "REVIEW_REQUIRED"
-    }
-  }
-}
